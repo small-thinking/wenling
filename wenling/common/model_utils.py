@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 import openai
 
-from wenling.common.utils import Logger, load_env
+from wenling.common.utils import load_env
 
 
 class Model(ABC):
@@ -46,7 +46,7 @@ class OpenAIChatModel(Model):
         """
         Generate text completion.
         """
-        response = self.client.chat.completions.create(
+        response = self.client.chat.completions.create(  # type: ignore
             model=model_type,
             messages=[
                 {

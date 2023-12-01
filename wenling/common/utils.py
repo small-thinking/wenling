@@ -2,9 +2,9 @@ import inspect
 import logging
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-import pytz
+import pytz  # type: ignore
 import requests  # type: ignore
 from colorama import Fore, ansi
 from dotenv import load_dotenv  # type: ignore

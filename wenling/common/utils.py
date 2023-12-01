@@ -2,9 +2,9 @@ import inspect
 import logging
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-import pytz
+import pytz  # type: ignore
 import requests  # type: ignore
 from colorama import Fore, ansi
 from dotenv import load_dotenv  # type: ignore
@@ -52,9 +52,7 @@ class Logger:
                 cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(
-        self, logger_name: str, verbose: bool = True, level: Any = logging.INFO
-    ):
+    def __init__(self, logger_name: str, verbose: bool = True, level: Any = logging.INFO):
         if not hasattr(self, "logger"):
             self.logger = logging.getLogger(logger_name)
             self.verbose = verbose
@@ -76,9 +74,7 @@ class Logger:
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]
         caller_line = caller_frame[2]
-        self.logger.debug(
-            Fore.MAGENTA + f"({caller_name} L{caller_line}): {message}" + Fore.RESET
-        )
+        self.logger.debug(Fore.MAGENTA + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)
 
     def info(self, message: str) -> None:
         if not self.verbose:
@@ -86,9 +82,7 @@ class Logger:
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]
         caller_line = caller_frame[2]
-        self.logger.info(
-            Fore.BLACK + f"({caller_name} L{caller_line}): {message}" + Fore.RESET
-        )
+        self.logger.info(Fore.BLACK + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)
 
     def error(self, message: str) -> None:
         if not self.verbose:
@@ -96,9 +90,7 @@ class Logger:
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]
         caller_line = caller_frame[2]
-        self.logger.error(
-            Fore.RED + f"({caller_name} L{caller_line}): {message}" + Fore.RESET
-        )
+        self.logger.error(Fore.RED + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)
 
     def warning(self, message: str) -> None:
         if not self.verbose:
@@ -106,6 +98,4 @@ class Logger:
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]
         caller_line = caller_frame[2]
-        self.logger.warning(
-            Fore.YELLOW + f"({caller_name} L{caller_line}): {message}" + Fore.RESET
-        )
+        self.logger.warning(Fore.YELLOW + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)

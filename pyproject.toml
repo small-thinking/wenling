@@ -16,6 +16,7 @@ pytz = "^2023.3.post1"
 colorama = "^0.4.6"
 requests = "^2.31.0"
 types-colorama = "^0.4.15.12"
+pydantic = "^2.5.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
@@ -27,3 +28,6 @@ mypy = "^1.7.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120

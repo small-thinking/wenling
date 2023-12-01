@@ -1,11 +1,12 @@
-from typing import Any, Dict, List, Optional
-from datetime import datetime
-import pytz
 import inspect
 import logging
-from colorama import Fore, ansi
 import threading
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import pytz
 import requests  # type: ignore
+from colorama import Fore, ansi
 from dotenv import load_dotenv  # type: ignore
 
 
@@ -37,6 +38,7 @@ def check_url_exists(url):
         return response.status_code == 200
     except requests.exceptions.RequestException:
         return False
+
 
 # Create a logger class that accept level setting.
 # The logger should be able to log to stdout and display the datetime, caller, and line of code.

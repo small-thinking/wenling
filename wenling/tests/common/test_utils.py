@@ -1,9 +1,12 @@
 """Test the utils.
 Run test: poetry run pytest tests/common/test_utils.py
 """
-import pytest
-from wenling.common.utils import *
 from unittest.mock import patch
+
+import pytest
+
+from wenling.common.utils import *
+
 
 @pytest.mark.parametrize(
     "input, expected",

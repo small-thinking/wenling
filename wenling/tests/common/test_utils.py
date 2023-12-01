@@ -1,5 +1,5 @@
 """Test the utils.
-Run test: poetry run pytest tests/common/test_utils.py
+Run test: poetry run pytest wenling/tests/common/test_utils.py
 """
 from unittest.mock import patch
 

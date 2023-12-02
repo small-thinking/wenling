@@ -48,7 +48,7 @@ def check_url_exists(url):
 
 
 @retrying.retry(wait_fixed=1000, stop_max_attempt_number=3)
-def fetch_url_content(url: str, css_selector: str) -> Optional[str]:
+def fetch_url_content(url: str, css_selector: str = "") -> Optional[str]:
     """
     Fetches and extracts content from a given URL based on the specified CSS selector.
 
@@ -68,7 +68,10 @@ def fetch_url_content(url: str, css_selector: str) -> Optional[str]:
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Find the first element matching the CSS Selector
-        element = soup.select_one(css_selector)
+        if css_selector:
+            element = soup.select_one(css_selector)
+        else:
+            element = soup.select_one("body")
 
         # Return the HTML content of the element, or None if no element is found
         return str(element) if element else None
@@ -139,6 +142,20 @@ class Logger:
 
 @retrying.retry(wait_fixed=1000, stop_max_attempt_number=3)
 async def upload_image_to_imgur(image_path: str, logger: Logger, verbose: bool = False) -> str:
+    """
+    Uploads an image to Imgur and returns the URL of the uploaded image.
+
+    Parameters:
+        image_path (str): The path to the image file to be uploaded.
+        logger (Logger): The logger object for logging messages.
+        verbose (bool, optional): Whether to log verbose messages. Defaults to False.
+
+    Returns:
+        str: The URL of the uploaded image.
+
+    Raises:
+        ValueError: If IMGUR_CLIENT_ID environment variable is not set.
+    """
     client_id = os.getenv("IMGUR_CLIENT_ID")
     if not client_id:
         raise ValueError("IMGUR_CLIENT_ID is not set")
@@ -169,6 +186,21 @@ async def upload_image_to_imgur(image_path: str, logger: Logger, verbose: bool =
 
 @retrying.retry(wait_fixed=1000, stop_max_attempt_number=3)
 async def save_image_to_imgur(image_url: str, logger: Logger, verbose: bool = False):
+    """
+    Save an image from the given URL to Imgur.
+
+    Args:
+        image_url (str): The URL of the image to be saved.
+        logger (Logger): An instance of the logger to log messages.
+        verbose (bool, optional): Whether to print verbose messages. Defaults to False.
+
+    Returns:
+        str: The URL of the image saved on Imgur.
+
+    Raises:
+        HTTPError: If there is an error while getting the image data.
+        Exception: If there is an error while uploading the image to Imgur.
+    """
     # Get the image data
     if image_url.startswith("https://github.com/"):
         image_url = image_url.replace("blob", "raw")

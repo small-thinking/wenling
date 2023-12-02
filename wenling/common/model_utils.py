@@ -2,6 +2,7 @@ import os
 from abc import ABC, abstractmethod
 
 import openai
+import retrying
 
 from wenling.common.utils import load_env
 
@@ -34,6 +35,7 @@ class OpenAIChatModel(Model):
         load_env()
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+    @retrying.retry(wait_fixed=5000, stop_max_attempt_number=3)
     def inference(
         self,
         user_prompt: str,

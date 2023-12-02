@@ -1,12 +1,12 @@
 """Store the data in Notion.
 """
-import json
+import asyncio
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from notion_client import AsyncClient
 
-from wenling.common.utils import Logger
+from wenling.common.utils import Logger, save_image_to_imgur
 
 
 class NotionStorage:
@@ -85,11 +85,12 @@ class NotionStorage:
                     }
                 )
             elif block.get("type") in ["image", "img"]:
+                imgur_url = await save_image_to_imgur(image_url=block["url"], logger=self.logger, verbose=self.verbose)
                 page_contents.append(
                     {
                         "object": "block",
-                        "type": "image",
-                        "image": {"type": "external", "external": {"url": block["url"]}},
+                        "type": "embed",
+                        "embed": {"url": imgur_url},
                     }
                 )
             elif block.get("type") == "text":
@@ -100,8 +101,16 @@ class NotionStorage:
                         "paragraph": {"rich_text": [{"type": "text", "text": {"content": block["text"]}}]},
                     }
                 )
+            elif block.get("type") == "numbered_list_item":
+                page_contents.append(
+                    {
+                        "object": "block",
+                        "type": "numbered_list_item",
+                        "numbered_list_item": {"rich_text": [{"type": "text", "text": {"content": block["text"]}}]},
+                    }
+                )
             else:
-                self.logger.warning(f"Unsupported block type: {block['type']}")
+                self.logger.warning(f"Unsupported block: {block}")
         return page_contents
 
     async def _add_to_database(self, database_id: str, json_obj: Dict[str, Any]) -> None:

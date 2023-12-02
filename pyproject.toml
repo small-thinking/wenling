@@ -17,6 +17,9 @@ colorama = "^0.4.6"
 requests = "^2.31.0"
 types-colorama = "^0.4.15.12"
 pydantic = "^2.5.2"
+bs4 = "^0.0.1"
+aiohttp = "^3.9.1"
+types-requests = "^2.31.0.10"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

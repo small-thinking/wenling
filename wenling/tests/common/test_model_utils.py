@@ -72,14 +72,22 @@ class TestOpenAIChatModel:
 
                 assert result == expected_result
 
-    # @patch("openai.OpenAI")  # Replace with your actual import
-    # def test_inference_no_choices(self, mock_openai, model):
-    #     # Mocking the OpenAI client's behavior for a response with no choices
-    #     mock_response = Mock()
-    #     mock_response.choices = []
-    #     mock_openai.chat.completions.create.return_value = mock_response
+    def test_inference_no_choices(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "mocked_api_key"}):
+            # Mock the OpenAI client
+            with patch("openai.OpenAI") as MockOpenAI:
+                model = OpenAIChatModel()
+                # Mocking the OpenAI client's behavior for a response with no choices
+                mock_openai_instance = MockOpenAI.return_value
+                mock_openai_instance.chat.completions.create.return_value = ChatCompletion(
+                    id="chatcmpl-123",
+                    created=1677652288,
+                    model="gpt-3.5-turbo-1106",
+                    object="chat.completion",
+                    choices=[],
+                )
 
-    #     # Expect an exception when choices are empty
-    #     with pytest.raises(Exception) as excinfo:
-    #         model.inference(user_prompt="Hello")
-    #     assert "Failed to parse choices" in str(excinfo.value)
+                # Expect an exception when choices are empty
+                with pytest.raises(Exception) as excinfo:
+                    model.inference(user_prompt="Hello")
+                assert "Failed to parse choices" in str(excinfo.value)

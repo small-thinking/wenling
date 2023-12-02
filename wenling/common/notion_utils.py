@@ -59,6 +59,8 @@ class NotionStorage:
         The blocks is expected to be a list of dicts.
         """
         page_contents: List[Dict[str, Any]] = []
+        if self.verbose:
+            self.logger.info("Creating blocks in the page...")
         for block in blocks:
             if block.get("type") in ["h1", "heading_1"]:
                 page_contents.append(
@@ -93,7 +95,7 @@ class NotionStorage:
                         "embed": {"url": imgur_url},
                     }
                 )
-            elif block.get("type") == "text":
+            elif block.get("type") in ["text", "span"]:
                 page_contents.append(
                     {
                         "object": "block",
@@ -137,10 +139,12 @@ class NotionStorage:
             "URL": [{"type": "text", "text": {"content": properties.get("url", "")}}],
         }
         children = await self._create_page_blocks(json_obj["children"])
+        if self.verbose:
+            self.logger.info("Create page...")
         response = await self.notion.pages.create(
             parent={"type": "database_id", "database_id": database_id},
             properties=page_properties,
-            children=children[:200],
+            children=children[:100],
         )
         if "id" not in response:
             raise ValueError("Failed to create the page.")
@@ -152,7 +156,8 @@ class NotionStorage:
         if self.verbose:
             self.logger.info("Storing data into Notion.")
         database_id = os.environ.get("NOTION_DATABASE_ID") or await self._get_or_create_database()
-        self.logger.info(f"Database id: {database_id}")
+        if self.verbose:
+            self.logger.info(f"Database id: {database_id}")
         await self._add_to_database(database_id, json_obj)
         if self.verbose:
             self.logger.info("Data stored into Notion.")

@@ -1,13 +1,26 @@
 # Use an official Python runtime as a parent image
 FROM python:3.10-bullseye
 
-# Define environment variable
-
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /usr/src/app
-COPY .env .
+# Define build-time environment variables
+ARG ENVIRONMENT
+ARG NOTION_TOKEN
+ARG NOTION_ROOT_PAGE_ID
+ARG NOTION_DATABASE_ID
+ARG IMGUR_CLIENT_ID
+
+# If in production, generate .env file, else copy existing .env
+RUN if [ "$ENVIRONMENT" = "prod" ]; then \
+        echo "NOTION_TOKEN=$NOTION_TOKEN" > .env && \
+        echo "NOTION_ROOT_PAGE_ID=$NOTION_ROOT_PAGE_ID" >> .env && \
+        echo "NOTION_DATABASE_ID=$NOTION_DATABASE_ID" >> .env && \
+        echo "IMGUR_CLIENT_ID=$IMGUR_CLIENT_ID" >> .env; \
+    fi
+
+# Copy the .env file in dev mode, else copy the rest of the files
+COPY .env* ./
 COPY . .
 
 # Make port 8000 available to the world outside this container

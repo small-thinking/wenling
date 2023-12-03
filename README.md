@@ -13,3 +13,9 @@ Intelligent Article Assembly: Utilizes AI algorithms to assemble collected infor
 Multi-platform Publishing: Capable of publishing content across various platforms including 小红书, B 站 (Bilibili), 知乎 (Zhihu), 微信公众号 (WeChat Official Accounts), Substack, Medium, Facebook, and Instagram.
 Cross-language Support: Designed to cater to both Chinese and English social media platforms, maximizing global reach and engagement.
 Customization and User Preferences: Allows for tailored content strategies based on user preferences and platform-specific nuances.
+
+# Setup
+## Build and run
+```
+docker-compose -f ./docker_compose.yml up --build wenling
+```

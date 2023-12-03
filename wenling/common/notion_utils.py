@@ -6,7 +6,9 @@ from typing import Any, Dict, List
 
 from notion_client import AsyncClient
 
-from wenling.common.utils import Logger, save_image_to_imgur
+from wenling.common.image_upload import (save_image_to_imgur,
+                                         upload_image_to_flickr)
+from wenling.common.utils import Logger
 
 
 class NotionStorage:
@@ -87,12 +89,19 @@ class NotionStorage:
                     }
                 )
             elif block.get("type") in ["image", "img"]:
-                imgur_url = await save_image_to_imgur(image_url=block["url"], logger=self.logger, verbose=self.verbose)
+                image_url = await save_image_to_imgur(image_url=block["url"], logger=self.logger, verbose=self.verbose)
+                # image_url = await upload_image_to_flickr(
+                #     image_url=block["url"],
+                #     title="placeholder title",
+                #     description="placeholder description",
+                #     tags=[],
+                #     logger=self.logger,
+                # )
                 page_contents.append(
                     {
                         "object": "block",
                         "type": "embed",
-                        "embed": {"url": imgur_url},
+                        "embed": {"url": image_url},
                     }
                 )
             elif block.get("type") in ["text", "span"]:

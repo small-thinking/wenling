@@ -441,6 +441,28 @@ pycodestyle = ">=2.11.0,<2.12.0"
 pyflakes = ">=3.1.0,<3.2.0"
 
 [[package]]
+name = "flickrapi"
+version = "2.4.0"
+description = "The Python interface to the Flickr API"
+optional = false
+python-versions = "*"
+files = [
+    {file = "flickrapi-2.4.0-py2.py3-none-any.whl", hash = "sha256:28e6d0ebafc83b79c58d5056b3370fb2ae6618e386fa691246f3240dbcd8b967"},
+    {file = "flickrapi-2.4.0.tar.gz", hash = "sha256:ffb27b0e4f6d3ae8fc7d20e4696d2de2f95093ecf665a93d7f1d5a3383f8e20d"},
+]
+
+[package.dependencies]
+requests = ">=2.2.1"
+requests-oauthlib = ">=0.4.0"
+requests-toolbelt = ">=0.3.1"
+six = ">=1.5.2"
+
+[package.extras]
+docs = ["sphinx (>=1.5.1)"]
+qa = ["flake8"]
+test = ["mock", "pytest (>=2.9.1)", "pytest-cov (>=2.2.1)", "responses (>=0.5.1)"]
+
+[[package]]
 name = "frozenlist"
 version = "1.4.0"
 description = "A list-like structure which implements collections.abc.MutableSequence"
@@ -772,6 +794,22 @@ files = [
 httpx = ">=0.15.0"
 
 [[package]]
+name = "oauthlib"
+version = "3.2.2"
+description = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "oauthlib-3.2.2-py3-none-any.whl", hash = "sha256:8139f29aac13e25d502680e9e19963e83f16838d48a0d71c287fe40e7067fbca"},
+    {file = "oauthlib-3.2.2.tar.gz", hash = "sha256:9859c40929662bec5d64f34d01c99e093149682a3f38915dc0655d5a633dd918"},
+]
+
+[package.extras]
+rsa = ["cryptography (>=3.0.0)"]
+signals = ["blinker (>=1.4.0)"]
+signedtoken = ["cryptography (>=3.0.0)", "pyjwt (>=2.0.0,<3)"]
+
+[[package]]
 name = "openai"
 version = "1.3.6"
 description = "The official Python library for the openai API"
@@ -1073,6 +1111,38 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
+name = "requests-oauthlib"
+version = "1.3.1"
+description = "OAuthlib authentication support for Requests."
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+files = [
+    {file = "requests-oauthlib-1.3.1.tar.gz", hash = "sha256:75beac4a47881eeb94d5ea5d6ad31ef88856affe2332b9aafb52c6452ccf0d7a"},
+    {file = "requests_oauthlib-1.3.1-py2.py3-none-any.whl", hash = "sha256:2577c501a2fb8d05a304c09d090d6e47c306fef15809d102b327cf8364bddab5"},
+]
+
+[package.dependencies]
+oauthlib = ">=3.0.0"
+requests = ">=2.0.0"
+
+[package.extras]
+rsa = ["oauthlib[signedtoken] (>=3.0.0)"]
+
+[[package]]
+name = "requests-toolbelt"
+version = "1.0.0"
+description = "A utility belt for advanced users of python-requests"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+files = [
+    {file = "requests-toolbelt-1.0.0.tar.gz", hash = "sha256:7681a0a3d047012b5bdc0ee37d7f8f07ebe76ab08caeccfc3921ce23c88d5bc6"},
+    {file = "requests_toolbelt-1.0.0-py2.py3-none-any.whl", hash = "sha256:cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06"},
+]
+
+[package.dependencies]
+requests = ">=2.0.1,<3.0.0"
+
+[[package]]
 name = "retrying"
 version = "1.3.4"
 description = "Retrying"
@@ -1344,4 +1414,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "6e1f457a2d2c5a338cf4d51e102b2206b689c18da50b81604c199c625fc8e64d"
+content-hash = "456ceff018e447166b8ee811351ec250162068d47618f4ab2d364eea1cffb799"

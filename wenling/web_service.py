@@ -1,5 +1,5 @@
 """
-Run with: 
+Run with: clear; python -m wenling.scripts.fetch_web_page
 """
 
 import re

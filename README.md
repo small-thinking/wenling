@@ -19,3 +19,12 @@ Customization and User Preferences: Allows for tailored content strategies based
 ```
 docker-compose -f ./docker_compose.yml up --build wenling
 ```
+
+# Deployment
+## Local test of Railway.app deployment
+See https://docs.railway.app/guides/cli#local-development.
+
+## Cleanup docker images not used
+```
+docker rm $(docker ps -a -q) ; docker images | grep '<none>' | awk '{print $3}' | xargs docker rmi
+```

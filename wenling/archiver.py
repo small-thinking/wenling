@@ -221,7 +221,7 @@ class WechatArticleArchiver(Archiver):
         article_json_obj["properties"]["type"] = "微信"
         article_json_obj["properties"]["datetime"] = get_datetime()
         tags = self._parse_tags(element_bs=element_bs) + [self._parse_author(element_bs=element_bs)]
-        tags = [tag.replace("#", "") for tag in tags]
+        tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
         article_json_obj["properties"]["tags"] = tags
         if self.verbose:
             json_object_str = json.dumps(article_json_obj, indent=2)

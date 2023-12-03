@@ -6,8 +6,7 @@ from typing import Any, Dict, List
 
 from notion_client import AsyncClient
 
-from wenling.common.image_upload import (save_image_to_imgur,
-                                         upload_image_to_flickr)
+from wenling.common.image_upload import *
 from wenling.common.utils import Logger
 
 

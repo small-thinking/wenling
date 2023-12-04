@@ -123,7 +123,7 @@ class NotionStorage:
                 self.logger.warning(f"Unsupported block: {block}")
         return page_contents
 
-    async def _add_to_database(self, database_id: str, json_obj: Dict[str, Any]) -> None:
+    async def _add_to_database(self, database_id: str, json_obj: Dict[str, Any]) -> str:
         """Add the data as a page to the database.
         The json object is expected to have two keys: properties and children.
         Each is also expected to be a dictionary.
@@ -158,14 +158,17 @@ class NotionStorage:
             raise ValueError("Failed to create the page.")
         if self.verbose:
             self.logger.info("Page created.")
+        # Return the page id
+        return response["id"]
 
-    async def store(self, json_obj: Dict[str, Any]):
+    async def store(self, json_obj: Dict[str, Any]) -> str:
         """Store the data into Notion."""
         if self.verbose:
             self.logger.info("Storing data into Notion.")
         database_id = os.environ.get("NOTION_DATABASE_ID") or await self._get_or_create_database()
         if self.verbose:
             self.logger.info(f"Database id: {database_id}")
-        await self._add_to_database(database_id, json_obj)
+        page_id = await self._add_to_database(database_id, json_obj)
         if self.verbose:
             self.logger.info("Data stored into Notion.")
+        return page_id

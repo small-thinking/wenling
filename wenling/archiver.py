@@ -59,11 +59,11 @@ class Archiver(ABC):
     def _set_name(self) -> str:
         pass
 
-    async def archive(self, url: str):
+    async def archive(self, url: str) -> str:
         if not check_url_exists(url):
             raise ValueError(f"The url {url} does not exist.")
         article_json_obj = await self._archive(url)
-        await self.notion_store.store(json_obj=article_json_obj)
+        return await self.notion_store.store(json_obj=article_json_obj)
 
     @abstractmethod
     async def _archive(self, url: str) -> Dict[str, Any]:

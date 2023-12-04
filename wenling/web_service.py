@@ -9,9 +9,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from wenling.archiver import ArchiverOrchestrator
-from wenling.common.utils import load_env
+from wenling.common.utils import Logger, load_env
 
 app = FastAPI()
+logger = Logger(logger_name=os.path.basename(__file__), verbose=True)
 
 
 class ArchiveRequest(BaseModel):
@@ -27,15 +28,21 @@ class GenerateArticleRequest(BaseModel):
 async def archive_article(request: ArchiveRequest):
     orchestrator = ArchiverOrchestrator(verbose=True)
     try:
+        # Log the params.
+        logger.info(f"Archive url: {request.url}")
         page_id = await orchestrator.archive(request.url)
+        if page_id is None:
+            raise HTTPException(status_code=404, detail="Corresponding archiver not found")
         return {"message": "Article archived successfully", "page_id": page_id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Print stack trace.
+        raise HTTPException(status_code=500, detail=f"Got the error: {str(e)}")
 
 
 @app.post("/generate-article/")
 async def generate_article(request: GenerateArticleRequest):
     # Dummy implementation for generating an article
+    logger.info(f"Generate article with params: {request.dict()}")
     return {"message": "Article generated successfully", "page_id": "123456789"}
 
 

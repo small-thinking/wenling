@@ -25,15 +25,17 @@ class ArchiverOrchestrator:
             }
         ]
 
-    async def archive(self, url: str):
+    async def archive(self, url: str) -> str:
         """Match the url with pattern and find the corresponding archiver."""
         for archiver in self.archivers:
             if re.match(pattern=archiver["match_regex"], string=url):
                 if self.verbose:
                     self.logger.info(f"Archive url with archiver {archiver['archiver'].name}...")
-                await archiver["archiver"].archive(url)
+                page_id = await archiver["archiver"].archive(url)
                 if self.verbose:
                     self.logger.info(f"Archived url with archiver {archiver['archiver'].name}.")
+                return page_id
+        return ""
 
 
 class Archiver(ABC):
@@ -258,6 +260,6 @@ class WechatArticleArchiver(Archiver):
                 json_object_str = json.dumps(article_json_obj, indent=2)
                 self.logger.info(f"Archived article: {json_object_str}")
         except Exception as e:
-            article_json_obj = {"error": str(e)}
+            raise ValueError(f"Error parsing content. Details: {str(e)}")
         finally:
             return article_json_obj

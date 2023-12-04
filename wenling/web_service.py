@@ -2,12 +2,14 @@
 Run with: clear; python -m wenling.scripts.fetch_web_page
 """
 
-import re
+import os
 
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from wenling.archiver import ArchiverOrchestrator
+from wenling.common.utils import load_env
 
 app = FastAPI()
 
@@ -38,6 +40,6 @@ async def generate_article(request: GenerateArticleRequest):
 
 
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("wenling:app", host="0.0.0.0", port=8000, log_level="debug", reload=True)
+    load_env()
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("wenling:app", host="0.0.0.0", port=port, log_level="debug", reload=True)

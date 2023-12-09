@@ -131,3 +131,5 @@ test_scripts
 **/completion.py
 **/*.patch
 scripts
+temp/*
+autogen_config.json

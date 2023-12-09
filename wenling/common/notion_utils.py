@@ -13,13 +13,14 @@ from wenling.common.utils import Logger
 class NotionStorage:
     """Store the data into notion knowledge base."""
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, image_upload_per_batch: int = 5, verbose: bool = False):
         self.verbose = verbose
         self.token = os.environ.get("NOTION_TOKEN")
         if not self.token:
             raise ValueError("Please set the Notion token in .env.")
         self.notion = AsyncClient(auth=self.token)
         self.root_page_id = os.environ.get("NOTION_ROOT_PAGE_ID")
+        self.image_upload_per_batch = image_upload_per_batch
         self.logger = Logger(os.path.basename(__file__), verbose=verbose)
         if self.verbose:
             self.logger.info("Notion storage initialized.")
@@ -62,6 +63,8 @@ class NotionStorage:
         page_contents: List[Dict[str, Any]] = []
         if self.verbose:
             self.logger.info("Creating blocks in the page...")
+        # Use a conter of image to control the pace of uploading images. Set rate limit to
+        image_counter = 0
         for block in blocks:
             if block.get("type") in ["h1", "heading_1"]:
                 page_contents.append(
@@ -88,6 +91,9 @@ class NotionStorage:
                     }
                 )
             elif block.get("type") in ["image", "img"]:
+                image_counter += 1
+                if image_counter % self.image_upload_per_batch == 0:
+                    await asyncio.sleep(60)
                 image_url = await save_image_to_imgur(image_url=block["url"], logger=self.logger, verbose=self.verbose)
                 # image_url = await upload_image_to_flickr(
                 #     image_url=block["url"],

@@ -13,7 +13,7 @@ from wenling.common.utils import Logger
 class NotionStorage:
     """Store the data into notion knowledge base."""
 
-    def __init__(self, image_upload_per_batch: int = 5, verbose: bool = False):
+    def __init__(self, image_upload_per_batch: int = 10, verbose: bool = False):
         self.verbose = verbose
         self.token = os.environ.get("NOTION_TOKEN")
         if not self.token:
@@ -109,6 +109,7 @@ class NotionStorage:
                         "embed": {"url": image_url},
                     }
                 )
+                await asyncio.sleep(1)
             elif block.get("type") in ["text", "span"]:
                 page_contents.append(
                     {

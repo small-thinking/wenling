@@ -20,7 +20,8 @@ class ArchiverOrchestrator:
         self.logger = Logger(logger_name=os.path.basename(__file__), verbose=verbose)
         self.archivers: List[Dict[str, Any]] = [
             {
-                "match_regex": r"^https://mp\.weixin\.qq\.com/s/.*$",
+                # Match url has mp.weixin.qq.com in it.
+                "match_regex": r"^https://mp\.weixin\.qq\.com/s\?.+$",
                 "archiver": WechatArticleArchiver(verbose=verbose),
             },
         ]
@@ -33,8 +34,6 @@ class ArchiverOrchestrator:
                 if self.verbose:
                     self.logger.info(f"Archive url with archiver {archiver['archiver'].name}...")
                 page_id = await archiver["archiver"].archive(url)
-                if self.verbose:
-                    self.logger.info(f"Archived url with archiver {archiver['archiver'].name}.")
                 return page_id
         # Match to general web archiver by default.
         if self.verbose:

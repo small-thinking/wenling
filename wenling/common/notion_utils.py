@@ -126,6 +126,18 @@ class NotionStorage:
                         "numbered_list_item": {"rich_text": [{"type": "text", "text": {"content": block["text"]}}]},
                     }
                 )
+            elif block.get("type") == "code":
+                page_contents.append(
+                    {
+                        "object": "block",
+                        "type": "code",
+                        "code": {
+                            "caption": [],
+                            "rich_text": [{"type": "text", "text": {"content": block["text"]}}],
+                            "language": "python",
+                        },
+                    }
+                )
             else:
                 self.logger.warning(f"Unsupported block: {block}")
         return page_contents

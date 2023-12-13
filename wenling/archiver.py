@@ -22,8 +22,9 @@ class ArchiverOrchestrator:
             {
                 "match_regex": r"^https://mp\.weixin\.qq\.com/s/.*$",
                 "archiver": WechatArticleArchiver(verbose=verbose),
-            }
+            },
         ]
+        self.default_archiver = GeneralWebArchiver(verbose=verbose)
 
     async def archive(self, url: str) -> str:
         """Match the url with pattern and find the corresponding archiver."""
@@ -35,7 +36,11 @@ class ArchiverOrchestrator:
                 if self.verbose:
                     self.logger.info(f"Archived url with archiver {archiver['archiver'].name}.")
                 return page_id
-        return ""
+        # Match to general web archiver by default.
+        if self.verbose:
+            self.logger.info(f"Archive url with archiver general web archiver...")
+        page_id = await self.default_archiver.archive(url)
+        return page_id
 
 
 class Archiver(ABC):
@@ -60,6 +65,24 @@ class Archiver(ABC):
     @abstractmethod
     def _set_name(self) -> str:
         pass
+
+    def _consolidate_content(self, content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Merge the consecutive texts or code blocks into one. The max size of each block should be less than 2000."""
+        if self.verbose:
+            self.logger.info("Consolidate the consecutive texts or code blocks into one...")
+        consolidated_content: List[Dict[str, Any]] = []
+        for block in content:
+            if block["type"] in ["text", "code"]:
+                if consolidated_content and consolidated_content[-1]["type"] == block["type"]:
+                    if len(consolidated_content[-1]["text"]) + len(block["text"]) < 2000:
+                        consolidated_content[-1]["text"] += "\n" + block["text"]
+                    else:
+                        consolidated_content.append(block)
+                else:
+                    consolidated_content.append(block)
+            else:
+                consolidated_content.append(block)
+        return consolidated_content
 
     async def archive(self, url: str) -> str:
         if not check_url_exists(url):
@@ -245,15 +268,204 @@ class WechatArticleArchiver(Archiver):
         if not element:
             raise ValueError(f"The url {url} does not have the element {self.root_css_selector}.")
         try:
+            paragraphs = self._parse_content(element_bs=element_bs)
+            # Consolidate the consecutive texts or code blocks into one.
+            paragraphs = self._consolidate_content(paragraphs)
             article_json_obj: Dict[str, Any] = {
                 "properties": {},
-                "children": self._parse_content(element_bs=element_bs),
+                "children": paragraphs,
             }
             article_json_obj["properties"]["url"] = url
             article_json_obj["properties"]["title"] = self._parse_title(element_bs=element_bs)
             article_json_obj["properties"]["type"] = "微信"
             article_json_obj["properties"]["datetime"] = get_datetime()
             tags = self._parse_tags(element_bs=element_bs) + [self._parse_author(element_bs=element_bs)]
+            tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
+            article_json_obj["properties"]["tags"] = tags
+            if self.verbose:
+                json_object_str = json.dumps(article_json_obj, indent=2)
+                self.logger.info(f"Archived article: {json_object_str}")
+        except Exception as e:
+            raise ValueError(f"Error parsing content. Details: {str(e)}")
+        finally:
+            return article_json_obj
+
+
+class WebPageArchiver(Archiver):
+    """
+    WebPageArchiver is a tool used to archive the bookmarked web pages.
+    """
+
+    def __init__(self, vendor_type: str = "openai", verbose: bool = False, **kwargs):
+        super().__init__(vendor_type=vendor_type, verbose=verbose)
+        self.root_css_selector = "html"
+        self.max_tokens = kwargs.get("max_tokens", 8192)
+        self.temperature = kwargs.get("temperature", 0.0)
+        self._extra_setup()
+
+    def _extra_setup(self):
+        self._set_name()
+
+    def _set_name(self) -> str:
+        return "WebPageArchiver"
+
+    def _parse_title(self, element_bs: BeautifulSoup) -> str:
+        """Get the title from the head -> title element, put it into {"type": "h1", "text": <title>}."""
+        if self.verbose:
+            self.logger.info(f"Extract the title...")
+        title_element = element_bs.select_one("head > title")
+        if not title_element:
+            # Use a default title if the title element is not found.
+            title = "Untitled"
+        title = title_element.get_text().strip()
+        return title
+
+    async def _parse_segment(self, batch_id: int, segment_tags: List[Tag]) -> List[Dict[str, Any]]:
+        """Extract the image urls and all texts from the given list of segment tags.
+        The returned list of extracted blocks will be merged into a long list.
+        """
+        if self.verbose:
+            self.logger.info(f"Extract the image urls and all texts from segment {batch_id}...")
+        texts = ""
+        for tag in segment_tags:
+            texts += tag.get_text().strip() + "\n"
+        texts = texts[: self.max_tokens]
+        prompt = f"""
+        Please help organize the raw contents extracted from a html into strucutred json blob.
+        The returned json keyed by "content" will be merged into a long list.
+        
+        Please note:
+        1. The html can contain titles (h1, h2, h3), texts, codes, images (<img>), and videos. 
+        2. If the texts themselves have ", please replace it with '.
+        3. Please merge consecutive code lines or paragraphs into one entry.
+        
+        The json blob is expected to have the following structure:
+        {{
+            "content": [
+                {{
+                    "type": "h1",
+                    "text": "Section title",
+                }},
+                {{
+                    "type": "h2",
+                    "text": "Subsection title",
+                }},
+                {{
+                    "type": "text",
+                    "text": "Paragraph text",
+                }},
+                {{
+                    "type": "code",
+                    "text": "Code",
+                }},
+                {{
+                    "type": "image",
+                    "url": "https://image_url",
+                }},
+                {{
+                    "type": "video",
+                    "url": "https://video_url",
+                }}
+            ]
+        }}
+        
+        The contents are below:
+        {texts}
+        """
+        json_response_str = self.model.inference(
+            user_prompt=prompt, max_tokens=self.max_tokens, temperature=self.temperature, response_format="json_object"
+        )
+        try:
+            json_obj = json.loads(json_response_str)
+            paragraphs = json_obj.get("content", [])
+            return paragraphs
+        except Exception as e:
+            self.logger.error(f"Error parsing the content. Details: {str(e)}. Return empty paragraphs.")
+            return []
+
+    async def _parse_content(self, element_bs: BeautifulSoup) -> List[Dict[str, Any]]:
+        """Extract the image urls and all texts.
+        And then leverage LLM to structurize the content into a json blob.
+        """
+        if self.verbose:
+            self.logger.info("Extract the image urls and all texts...")
+        body_tag = element_bs.select_one("body")
+
+        segments_to_include = ["p", "div", "h1", "h2", "img", "pre"]
+        segment_tags = body_tag.find_all(segments_to_include)
+        if self.verbose:
+            self.logger.info(f"Total number of segments: {len(segment_tags)}")
+
+        # Filter out nested elements
+        unique_segments = []
+        for segment in segment_tags:
+            # Check if the segment is not a child of any other segments
+            if not any(parent in segment.parents for parent in segment_tags):
+                unique_segments.append(segment)
+
+        if self.verbose:
+            self.logger.info(f"Total number of unique segments: {len(unique_segments)}")
+
+        paragraphs: List[Dict[str, Any]] = []
+        for batch_id in range(0, len(unique_segments), 10):
+            segment_tags_batch = unique_segments[batch_id : batch_id + 10]
+            paragraphs.extend(await self._parse_segment(batch_id=batch_id, segment_tags=segment_tags_batch))
+        # Consolidate.
+        paragraphs = self._consolidate_content(paragraphs)
+
+        return paragraphs
+
+    async def _parse_tags(self, paragraphs: List[Dict[str, Any]]) -> List[str]:
+        """Leverage the LLM to auto-generate the tags based on the contents."""
+        if self.verbose:
+            self.logger.info(f"Generate tags based on the contents...")
+        contents_str = "\n".join([paragraph.get("text", "") for paragraph in paragraphs])
+        prompt = f"""
+        Please help generate the tags based on the contents below:
+        ---
+        {contents_str}
+        ---
+        
+        Please generate the tags in the same language as the contents, and return in below json format:
+        {{
+            "tags": ["tag1", "tag2", "tag3"]
+        }}
+        """
+        json_response_str = await self.model.inference(
+            user_prompt=prompt, max_tokens=256, temperature=0.0, response_format="json_object"
+        )
+        try:
+            json_obj = json.loads(json_response_str)
+            tags = json_obj.get("tags", [])
+            return tags
+        except Exception as e:
+            self.logger.error(f"Error parsing the tags. Details: {str(e)}. Return empty tags.")
+            return []
+
+    async def _archive(self, url: str) -> Dict[str, Any]:
+        """Get the content block from the web page.
+        Parse the elements and put them into a json object with list of elements.
+        """
+        # TODO:
+        # 1. Get the content from the body block.
+        element = fetch_url_content(url=url, css_selector=self.root_css_selector)
+        element_bs = BeautifulSoup(element, "html.parser")
+        if not element:
+            raise ValueError(f"The url {url} does not have the element {self.root_css_selector}.")
+        article_json_obj: Dict[str, Any] = {
+            "properties": {},
+            "children": {},
+        }
+        try:
+            article_json_obj["properties"]["url"] = url
+            article_json_obj["properties"]["title"] = self._parse_title(element_bs=element_bs)
+            article_json_obj["properties"]["type"] = "网页"
+            article_json_obj["properties"]["datetime"] = get_datetime()
+
+            contents = await self._parse_content(element_bs=element_bs)
+            article_json_obj["children"] = contents
+            # Leverage LLM to generate the tags based on the article json obj contents.
+            tags = await self._parse_tags(contents)
             tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
             article_json_obj["properties"]["tags"] = tags
             if self.verbose:

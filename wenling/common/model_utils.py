@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import openai
 import retrying
 
-from wenling.common.utils import load_env
+from wenling.common.utils import Logger, load_env
 
 
 class Model(ABC):
@@ -14,8 +14,9 @@ class Model(ABC):
 
     vendor_type: str
 
-    def __init__(self, vendor_type: str):
+    def __init__(self, vendor_type: str, verbose: bool = False):
         self.vendor_type = vendor_type
+        self.logger = Logger(logger_name=os.path.basename(__file__), verbose=verbose)
 
     @abstractmethod
     def inference(self, *args, **kwargs):
@@ -35,7 +36,7 @@ class OpenAIChatModel(Model):
         load_env()
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    @retrying.retry(wait_fixed=5000, stop_max_attempt_number=3)
+    @retrying.retry(stop_max_attempt_number=3)
     def inference(
         self,
         user_prompt: str,
@@ -48,21 +49,25 @@ class OpenAIChatModel(Model):
         """
         Generate text completion.
         """
-        response = self.client.chat.completions.create(  # type: ignore
-            model=model_type,
-            messages=[
-                {
-                    "role": "system",
-                    "content": sys_prompt,
-                },
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=min(4000, max_tokens),
-            response_format=response_format,
-            temperature=temperature,
-        )
+        try:
+            response = self.client.chat.completions.create(  # type: ignore
+                model=model_type,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": sys_prompt,
+                    },
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=min(4000, max_tokens),
+                response_format={"type": response_format},
+                temperature=temperature,
+            )
+        except Exception as e:
+            self.logger.error(f"Got the error: {str(e)}")
+            response = None
         # refactor the below line by checking the response.choices[0].message.content step by step, and handle the error.
-        if not response.choices or len(response.choices) == 0:
+        if not response or not response.choices or len(response.choices) == 0:
             raise Exception(f"Failed to parse choices from openai.ChatCompletion response. The response: {response}")
         first_choice = response.choices[0]
         if not first_choice.message:

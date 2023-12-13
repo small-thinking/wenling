@@ -24,7 +24,7 @@ class ArchiverOrchestrator:
                 "archiver": WechatArticleArchiver(verbose=verbose),
             },
         ]
-        self.default_archiver = GeneralWebArchiver(verbose=verbose)
+        self.default_archiver = WebPageArchiver(verbose=verbose)
 
     async def archive(self, url: str) -> str:
         """Match the url with pattern and find the corresponding archiver."""

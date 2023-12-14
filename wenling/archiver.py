@@ -21,7 +21,7 @@ class ArchiverOrchestrator:
         self.archivers: List[Dict[str, Any]] = [
             {
                 # Match url has mp.weixin.qq.com in it.
-                "match_regex": r"^https://mp\.weixin\.qq\.com/s\?.+$",
+                "match_regex": r"^https://mp\.weixin\.qq\.com/s/.*$",
                 "archiver": WechatArticleArchiver(verbose=verbose),
             },
         ]
@@ -45,7 +45,7 @@ class ArchiverOrchestrator:
 class Archiver(ABC):
     """Archiver is a tool used to archive the bookmarked articles."""
 
-    def __init__(self, vendor_type: str = "openai", verbose: bool = False):
+    def __init__(self, vendor_type: str = "openai", verbose: bool = False, **kewargs):
         load_env()
         self.api_key = os.getenv("ARCHIVER_API_KEY")
         self.verbose = verbose
@@ -102,7 +102,7 @@ class WechatArticleArchiver(Archiver):
     WechatArticleArchiver is a tool used to archive the bookmarked wechart articles.
     """
 
-    def __init__(self, vendor_type: str = "openai", verbose: bool = False):
+    def __init__(self, vendor_type: str = "openai", verbose: bool = False, **kwargs):
         super().__init__(vendor_type=vendor_type, verbose=verbose)
         self.root_css_selector = "div#img-content.rich_media_wrp"
 
@@ -113,8 +113,10 @@ class WechatArticleArchiver(Archiver):
         """Get the title from the first h1 element, put it into {"type": "h1", "text": <title>}."""
         title_element = element_bs.select_one("h1")
         if not title_element:
-            raise ValueError("Cannot find title element.")
-        title = title_element.get_text().strip()
+            self.logger.warning("Cannot find title element.")
+            title = "Untitled"
+        else:
+            title = title_element.get_text().strip()
         return title
 
     def _parse_author(self, element_bs: BeautifulSoup) -> str:
@@ -309,22 +311,34 @@ class WebPageArchiver(Archiver):
         return "WebPageArchiver"
 
     def _parse_title(self, element_bs: BeautifulSoup) -> str:
-        """Get the title from the head -> title element, put it into {"type": "h1", "text": <title>}."""
+        """Get the title from the head -> title element, og:title, or twitter:title meta tags."""
         if self.verbose:
-            self.logger.info(f"Extract the title...")
+            self.logger.info(f"Extracting the title from the html...")
+
+        # First, try to get the title from the <title> tag
         title_element = element_bs.select_one("head > title")
-        if not title_element:
-            # Use a default title if the title element is not found.
-            title = "Untitled"
-        title = title_element.get_text().strip()
-        return title
+        if title_element and title_element.get_text().strip():
+            return title_element.get_text().strip()
+
+        # If not found or empty, try the og:title meta tag
+        og_title_element = element_bs.select_one("meta[property='og:title']")
+        if og_title_element and og_title_element.get("content", "").strip():
+            return og_title_element["content"].strip()
+
+        # If still not found, try the twitter:title meta tag
+        twitter_title_element = element_bs.select_one("meta[property='twitter:title']")
+        if twitter_title_element and twitter_title_element.get("content", "").strip():
+            return twitter_title_element["content"].strip()
+
+        # If none of these are found, default to "Untitled"
+        if self.verbose:
+            self.logger.warning("Cannot find title element.")
+        return "Untitled"
 
     async def _parse_segment(self, batch_id: int, segment_tags: List[Tag]) -> List[Dict[str, Any]]:
         """Extract the image urls and all texts from the given list of segment tags.
         The returned list of extracted blocks will be merged into a long list.
         """
-        if self.verbose:
-            self.logger.info(f"Extract the image urls and all texts from segment {batch_id}...")
         texts = ""
         for tag in segment_tags:
             texts += tag.get_text().strip() + "\n"
@@ -408,6 +422,8 @@ class WebPageArchiver(Archiver):
         paragraphs: List[Dict[str, Any]] = []
         for batch_id in range(0, len(unique_segments), 10):
             segment_tags_batch = unique_segments[batch_id : batch_id + 10]
+            if self.verbose:
+                self.logger.info(f"Processing segment batch {batch_id}...")
             paragraphs.extend(await self._parse_segment(batch_id=batch_id, segment_tags=segment_tags_batch))
         # Consolidate.
         paragraphs = self._consolidate_content(paragraphs)
@@ -460,7 +476,6 @@ class WebPageArchiver(Archiver):
             article_json_obj["properties"]["title"] = self._parse_title(element_bs=element_bs)
             article_json_obj["properties"]["type"] = "网页"
             article_json_obj["properties"]["datetime"] = get_datetime()
-
             contents = await self._parse_content(element_bs=element_bs)
             article_json_obj["children"] = contents
             # Leverage LLM to generate the tags based on the article json obj contents.

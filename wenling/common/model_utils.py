@@ -34,7 +34,7 @@ class OpenAIChatModel(Model):
     def __init__(self, *args, **kwargs):
         super().__init__(vendor_type="openai", *args, **kwargs)
         load_env()
-        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
     @retrying.retry(stop_max_attempt_number=3)
     def inference(

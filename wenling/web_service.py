@@ -13,6 +13,7 @@ from wenling.common.utils import Logger, load_env
 
 app = FastAPI()
 logger = Logger(logger_name=os.path.basename(__file__), verbose=True)
+load_env()
 
 
 class ArchiveRequest(BaseModel):
@@ -42,11 +43,10 @@ async def archive_article(request: ArchiveRequest):
 @app.post("/generate-article/")
 async def generate_article(request: GenerateArticleRequest):
     # Dummy implementation for generating an article
-    logger.info(f"Generate article with params: {request.dict()}")
+    logger.info(f"Generate article with params: {request}")
     return {"message": "Article generated successfully", "page_id": "123456789"}
 
 
 if __name__ == "__main__":
-    load_env()
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("wenling:app", host="0.0.0.0", port=port, log_level="debug", reload=True)

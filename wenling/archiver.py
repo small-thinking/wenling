@@ -420,8 +420,8 @@ class WebPageArchiver(Archiver):
             self.logger.info(f"Total number of unique segments: {len(unique_segments)}")
 
         paragraphs: List[Dict[str, Any]] = []
-        for batch_id in range(0, len(unique_segments), 10):
-            segment_tags_batch = unique_segments[batch_id : batch_id + 10]
+        for batch_id in range(0, len(unique_segments), 20):
+            segment_tags_batch = unique_segments[batch_id : batch_id + 20]
             if self.verbose:
                 self.logger.info(f"Processing segment batch {batch_id}...")
             paragraphs.extend(await self._parse_segment(batch_id=batch_id, segment_tags=segment_tags_batch))

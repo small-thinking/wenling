@@ -93,6 +93,8 @@ class NotionStorage:
             elif block.get("type") in ["image", "img"]:
                 image_counter += 1
                 if image_counter % self.image_upload_per_batch == 0:
+                    if self.verbose:
+                        self.logger.info(f"Sleeping for 60 seconds to avoid rate limit...")
                     await asyncio.sleep(60)
                 image_url = await save_image_to_imgur(image_url=block["url"], logger=self.logger, verbose=self.verbose)
                 # image_url = await upload_image_to_flickr(
@@ -124,6 +126,18 @@ class NotionStorage:
                         "object": "block",
                         "type": "numbered_list_item",
                         "numbered_list_item": {"rich_text": [{"type": "text", "text": {"content": block["text"]}}]},
+                    }
+                )
+            elif block.get("type") == "code":
+                page_contents.append(
+                    {
+                        "object": "block",
+                        "type": "code",
+                        "code": {
+                            "caption": [],
+                            "rich_text": [{"type": "text", "text": {"content": block["text"]}}],
+                            "language": "python",
+                        },
                     }
                 )
             else:

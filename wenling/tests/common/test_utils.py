@@ -25,10 +25,9 @@ def test_get_datetime(input, expected):
     ],
 )
 def test_check_url_exists(url, status_code, expected):
-    with patch("requests.head") as mock_head:
-        mock_head.return_value.status_code = status_code
-        result = check_url_exists(url)
-        assert result == expected
+    with patch("requests.get", return_value=MagicMock(status_code=status_code)) as mock_get:
+        assert check_url_exists(url) == expected
+        mock_get.assert_called_once_with(url)
 
 
 @pytest.mark.parametrize(

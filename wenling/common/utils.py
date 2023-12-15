@@ -41,7 +41,7 @@ def get_datetime(timestamp: Optional[float] = None) -> str:
 
 def check_url_exists(url):
     try:
-        response = requests.head(url)
+        response = requests.get(url)
         return response.status_code == 200
     except requests.exceptions.RequestException:
         return False
@@ -105,7 +105,7 @@ class Logger:
             self.logger.addHandler(self.console_handler)
 
     def output(self, message: str, color: str = ansi.Fore.GREEN) -> None:
-        print(color + message + Fore.RESET)
+        print(color + message + Fore.RESET, flush=True)
 
     def debug(self, message: str) -> None:
         if not self.verbose:

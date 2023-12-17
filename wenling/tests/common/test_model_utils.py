@@ -56,7 +56,7 @@ class TestOpenAIChatModel:
                             finish_reason="stop",
                             index=0,
                             text="aaa",
-                            logprobs={"content": 0},
+                            logprobs={"content": []},
                         )
                     ],
                 )

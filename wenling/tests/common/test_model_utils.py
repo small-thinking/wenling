@@ -56,6 +56,7 @@ class TestOpenAIChatModel:
                             finish_reason="stop",
                             index=0,
                             text="aaa",
+                            logprobs={"dummy_field": 0},  # Add a dummy logprobs field
                         )
                     ],
                 )

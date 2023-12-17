@@ -210,6 +210,11 @@ class WechatArticleArchiver(Archiver):
                 if em_text not in cache:
                     parsed_elements.append({"type": "text", "text": em_text})
                     cache[em_text] = True
+            elif paragraph_tag.name == "figure":
+                image_url = paragraph_tag.find("img")["data-src"]
+                if image_url not in cache:
+                    parsed_elements.append({"type": "image", "url": image_url})
+                    cache[image_url] = True
             else:
                 content = paragraph_tag.get_text().strip()
                 if content:
@@ -225,7 +230,7 @@ class WechatArticleArchiver(Archiver):
         content_list = []
         try:
             for tag in section_tag.descendants:
-                if tag.name in ["p", "blockquote", "span", "ul", "ol"]:
+                if tag.name in ["p", "blockquote", "span", "ul", "ol", "figure"]:
                     blob = self._parse_paragraph(tag, cache)
                     if blob:
                         content_list.extend(blob)
@@ -251,7 +256,7 @@ class WechatArticleArchiver(Archiver):
                 content_json_obj.extend(self._parse_section(section, cache))
 
             # Process <p>, <ul>, <ol> tags that are direct children of the content_element
-            for tag in content_element.find_all(["p", "blockquote", "span", "ul", "ol"], recursive=False):
+            for tag in content_element.find_all(["p", "blockquote", "span", "ul", "ol", "figure"], recursive=False):
                 blob = self._parse_paragraph(tag, cache)
                 if blob:
                     content_json_obj.extend(blob)

@@ -140,6 +140,14 @@ class NotionStorage:
                         },
                     }
                 )
+            elif block.get("type") == "quote":
+                page_contents.append(
+                    {
+                        "object": "block",
+                        "type": "quote",
+                        "quote": {"rich_text": [{"type": "text", "text": {"content": block["text"]}}]},
+                    }
+                )
             else:
                 self.logger.warning(f"Unsupported block: {block}")
         return page_contents

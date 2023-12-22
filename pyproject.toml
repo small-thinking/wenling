@@ -26,6 +26,7 @@ flickrapi = "^2.4.0"
 pyautogen = "^0.2.0"
 cffi = "^1.16.0"
 autogenra = "^0.0.10a0"
+pymemgpt = "^0.2.7"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

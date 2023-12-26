@@ -229,11 +229,17 @@ class WechatArticleArchiver(Archiver):
     def _parse_section(self, section_tag: Tag, cache: Dict[str, Any]) -> List[Dict[str, Any]]:
         content_list = []
         try:
+            has_descendants = False
             for tag in section_tag.descendants:
                 if tag.name in ["p", "blockquote", "span", "ul", "ol", "figure"]:
+                    has_descendants = True
                     blob = self._parse_paragraph(tag, cache)
                     if blob:
                         content_list.extend(blob)
+            if not has_descendants:
+                content = section_tag.get_text().strip()
+                if content:
+                    content_list.append({"type": "text", "text": content})
         except Exception as e:
             raise ValueError(f"Error parsing content.")
         return content_list

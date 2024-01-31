@@ -17,7 +17,7 @@ Customization and User Preferences: Allows for tailored content strategies based
 # Setup
 ## Build and run
 ```
-docker-compose -f ./docker_compose.yml up --build wenling
+docker-compose -f ./docker-compose.yml up --build wenling
 ```
 
 # Deployment

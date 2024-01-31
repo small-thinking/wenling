@@ -5,13 +5,15 @@ Run with: clear; python -m wenling.scripts.fetch_web_page
 import os
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from wenling.archiver import ArchiverOrchestrator
 from wenling.common.utils import Logger, load_env
 
 app = FastAPI()
+security = HTTPBearer()
 logger = Logger(logger_name=os.path.basename(__file__), verbose=True)
 load_env()
 
@@ -25,8 +27,25 @@ class GenerateArticleRequest(BaseModel):
     tags: list[str]
 
 
+def get_api_key(credentials: HTTPAuthorizationCredentials = Security(security)):
+    if credentials:
+        api_key = credentials.credentials
+        if api_key == os.environ.get("WENLING_API_KEY"):
+            return api_key
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid API Key",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API Key not found",
+        )
+
+
 @app.post("/archive-article/")
-async def archive_article(request: ArchiveRequest):
+async def archive_article(request: ArchiveRequest, api_key: str = Depends(get_api_key)):
     orchestrator = ArchiverOrchestrator(verbose=True)
     try:
         # Log the params.
@@ -41,7 +60,7 @@ async def archive_article(request: ArchiveRequest):
 
 
 @app.post("/generate-article/")
-async def generate_article(request: GenerateArticleRequest):
+async def generate_article(request: GenerateArticleRequest, api_key: str = Depends(get_api_key)):
     # Dummy implementation for generating an article
     logger.info(f"Generate article with params: {request}")
     return {"message": "Article generated successfully", "page_id": "123456789"}

@@ -33,6 +33,9 @@ def get_api_key(credentials: HTTPAuthorizationCredentials = Security(security)):
         if api_key == os.environ.get("WENLING_API_KEY"):
             return api_key
         else:
+            # Print out the entire request.
+            logger.info(f"Request: {credentials}")
+            logger.error(f"Invalid API Key Provided: {api_key}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid API Key",

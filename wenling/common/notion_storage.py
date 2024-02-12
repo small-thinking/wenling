@@ -1,5 +1,6 @@
 """Store the data in Notion.
 """
+
 import asyncio
 import os
 from typing import Any, Dict, List

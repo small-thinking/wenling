@@ -193,6 +193,7 @@ class NotionStorage:
             return response["id"]
         except Exception as e:
             self.logger.error(f"An error occurred while creating the page: {str(e)}")
+            return "error"
 
     async def store(self, json_obj: Dict[str, Any]) -> str:
         """Store the data into Notion."""

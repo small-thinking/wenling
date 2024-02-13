@@ -16,28 +16,27 @@ from wenling.common.utils import *
 
 
 class ArchiverOrchestrator:
-    def __init__(self, verbose: bool = False):
-        self.verbose = verbose
-        self.logger = Logger(logger_name=os.path.basename(__file__), verbose=verbose)
+    def __init__(self):
+        self.logger = Logger(logger_name=os.path.basename(__file__))
         self.archivers: List[Dict[str, Any]] = [
             {
                 # Match url has mp.weixin.qq.com in it.
                 "match_regex": r"^https://mp\.weixin\.qq\.com/s/.*$",
-                "archiver": WechatArticleArchiver(verbose=verbose),
+                "archiver": WechatArticleArchiver(),
             },
         ]
-        self.default_archiver = WebPageArchiver(verbose=verbose)
+        self.default_archiver = WebPageArchiver()
 
     async def archive(self, url: str, notes: Optional[str] = None) -> str:
         """Match the url with pattern and find the corresponding archiver."""
         for archiver in self.archivers:
             if re.match(pattern=archiver["match_regex"], string=url):
-                if self.verbose:
+                if os.environ.get("VERBOSE") == "True":
                     self.logger.info(f"Archive url with archiver {archiver['archiver'].name} with notes {notes}...")
                 page_id = await archiver["archiver"].archive(url=url, notes=notes)
                 return page_id
         # Match to general web archiver by default.
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info(f"Archive url with archiver general web archiver...")
         page_id = await self.default_archiver.archive(url=url, notes=notes)
         return page_id
@@ -46,12 +45,11 @@ class ArchiverOrchestrator:
 class Archiver(ABC):
     """Archiver is a tool used to archive the bookmarked articles."""
 
-    def __init__(self, vendor_type: str = "openai", verbose: bool = False, **kwargs):
+    def __init__(self, vendor_type: str = "openai", **kwargs):
         load_dotenv(override=True)
         self.api_key = os.getenv("ARCHIVER_API_KEY")
-        self.verbose = verbose
-        self.logger = Logger(logger_name=os.path.basename(__file__), verbose=verbose)
-        self.notion_store = NotionStorage(verbose=verbose)
+        self.logger = Logger(logger_name=os.path.basename(__file__))
+        self.notion_store = NotionStorage()
         if vendor_type == "openai":
             self.model = OpenAIChatModel()
         else:
@@ -89,7 +87,7 @@ class Archiver(ABC):
         try:
             json_obj = json.loads(json_response_str)
             tags = json_obj.get("tags", [])
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.info(f"Auto-generated tags: {tags}")
             return tags
         except Exception as e:
@@ -102,12 +100,17 @@ class Archiver(ABC):
 
     def _consolidate_content(self, content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Merge the consecutive texts or code blocks into one. The max size of each block should be less than 2000."""
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Consolidate the consecutive texts or code blocks into one...")
         consolidated_content: List[Dict[str, Any]] = []
         for block in content:
             if block["type"] in ["text", "code"]:
-                if consolidated_content and consolidated_content[-1]["type"] == block["type"]:
+                if len(block["text"]) >= 2000:
+                    if os.environ.get("VERBOSE") == "True":
+                        self.logger.warning(f"The block is too long, chunk to size of 2000.")
+                    for i in range(0, len(block["text"]), 2000):
+                        consolidated_content.append({"type": block["type"], "text": block["text"][i : i + 2000]})
+                elif consolidated_content and consolidated_content[-1]["type"] == block["type"]:
                     if len(consolidated_content[-1]["text"]) + len(block["text"]) < 2000:
                         consolidated_content[-1]["text"] += "\n" + block["text"]
                     else:
@@ -137,8 +140,8 @@ class WechatArticleArchiver(Archiver):
     WechatArticleArchiver is a tool used to archive the bookmarked wechart articles.
     """
 
-    def __init__(self, vendor_type: str = "openai", verbose: bool = False, **kwargs):
-        super().__init__(vendor_type=vendor_type, verbose=verbose)
+    def __init__(self, vendor_type: str = "openai", **kwargs):
+        super().__init__(vendor_type=vendor_type)
         self.root_css_selector = "div#img-content.rich_media_wrp"
 
     def _set_name(self) -> str:
@@ -161,7 +164,7 @@ class WechatArticleArchiver(Archiver):
         author = ""
         author_element = element_bs.select_one(".rich_media_meta.rich_media_meta_text")
         if not author_element:
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.warning("Cannot find author element.")
         else:
             author = author_element.get_text().strip()
@@ -184,7 +187,7 @@ class WechatArticleArchiver(Archiver):
         tags = []
         tags_element = element_bs.select(".article-tag__item")
         if not tags_element:
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.warning("Cannot find tags element.")
         else:
             tags = [tag.get_text().strip() for tag in tags_element]
@@ -344,7 +347,7 @@ class WechatArticleArchiver(Archiver):
             tags.extend(auto_tags)
             article_json_obj["properties"]["tags"] = tags
 
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 json_object_str = json.dumps(article_json_obj, indent=2)
                 self.logger.info(f"Archived article: {json_object_str}")
         except Exception as e:
@@ -359,8 +362,8 @@ class WebPageArchiver(Archiver):
     WebPageArchiver is a tool used to archive the bookmarked web pages.
     """
 
-    def __init__(self, vendor_type: str = "openai", verbose: bool = False, **kwargs):
-        super().__init__(vendor_type=vendor_type, verbose=verbose)
+    def __init__(self, vendor_type: str = "openai", **kwargs):
+        super().__init__(vendor_type=vendor_type)
         self.root_css_selector = "html"
         self.max_tokens = kwargs.get("max_tokens", 8192)
         self.temperature = kwargs.get("temperature", 0.0)
@@ -374,7 +377,7 @@ class WebPageArchiver(Archiver):
 
     def _parse_title(self, element_bs: BeautifulSoup) -> str:
         """Get the title from the head -> title element, og:title, or twitter:title meta tags."""
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info(f"Extracting the title from the html...")
 
         # First, try to get the title from the <title> tag
@@ -393,7 +396,7 @@ class WebPageArchiver(Archiver):
             return twitter_title_element["content"].strip()
 
         # If none of these are found, default to "Untitled"
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.warning("Cannot find title element.")
         return "Untitled"
 
@@ -462,13 +465,13 @@ class WebPageArchiver(Archiver):
         """Extract the image urls and all texts.
         And then leverage LLM to structurize the content into a json blob.
         """
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Extract the image urls and all texts...")
         body_tag = element_bs.select_one("body")
 
         segments_to_include = ["p", "div", "h1", "h2", "img", "pre"]
         segment_tags = body_tag.find_all(segments_to_include)
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info(f"Total number of segments: {len(segment_tags)}")
 
         # Filter out nested elements
@@ -478,13 +481,13 @@ class WebPageArchiver(Archiver):
             if not any(parent in segment.parents for parent in segment_tags):
                 unique_segments.append(segment)
 
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info(f"Total number of unique segments: {len(unique_segments)}")
 
         paragraphs: List[Dict[str, Any]] = []
         for batch_id in range(0, len(unique_segments), 20):
             segment_tags_batch = unique_segments[batch_id : batch_id + 20]
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.info(f"Processing segment batch {batch_id}...")
             paragraphs.extend(await self._parse_segment(batch_id=batch_id, segment_tags=segment_tags_batch))
         # Consolidate.
@@ -494,7 +497,7 @@ class WebPageArchiver(Archiver):
 
     async def _parse_tags(self, paragraphs: List[Dict[str, Any]]) -> List[str]:
         """Leverage the LLM to auto-generate the tags based on the contents."""
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info(f"Generate tags based on the contents...")
         contents_str = "\n".join([paragraph.get("text", "") for paragraph in paragraphs])
         prompt = f"""
@@ -539,16 +542,19 @@ class WebPageArchiver(Archiver):
             article_json_obj["properties"]["title"] = self._parse_title(element_bs=element_bs)
             article_json_obj["properties"]["type"] = "网页"
             article_json_obj["properties"]["datetime"] = get_datetime()
-            contents = await self._parse_content(element_bs=element_bs)
-            article_json_obj["children"] = contents
+            paragraphs = await self._parse_content(
+                element_bs=element_bs
+            )  # Consolidate the consecutive texts or code blocks into one.
+            paragraphs = self._consolidate_content(paragraphs)
+            article_json_obj["children"] = paragraphs
             # Leverage LLM to generate the tags based on the article json obj contents.
-            tags = await self._parse_tags(contents)
+            tags = await self._parse_tags(paragraphs)
             tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
             self.logger.info(f"Auto-generate tags based on the contents...")
             auto_tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
             tags += auto_tags
             article_json_obj["properties"]["tags"] = tags
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 json_object_str = json.dumps(article_json_obj, indent=2)
                 self.logger.info(f"Archived article: {json_object_str}")
         except Exception as e:

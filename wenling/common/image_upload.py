@@ -16,9 +16,7 @@ from flickrapi.auth import FlickrAccessToken
 from wenling.common.utils import Logger
 
 
-async def upload_image_to_flickr(
-    image_url: str, title: str, description: str, tags: List[str], logger: Logger, verbose: bool = False
-) -> str:
+async def upload_image_to_flickr(image_url: str, title: str, description: str, tags: List[str], logger: Logger) -> str:
     """
     Uploads an image to Flickr and returns the URL of the uploaded photo.
 
@@ -63,7 +61,7 @@ async def upload_image_to_flickr(
         with tempfile.NamedTemporaryFile(delete=False) as temp:
             temp.write(response.content)
             temp_file_path = temp.name
-        if verbose:
+        if os.environ.get("VERBOSE") == "True":
             logger.info(f"For flickr upload, download file to {temp_file_path}.")
 
         response = flickr.upload(
@@ -82,14 +80,13 @@ async def upload_image_to_flickr(
 
 
 @retrying.retry(wait_fixed=1000, stop_max_attempt_number=3)
-async def upload_image_to_imgur(image_path: str, logger: Logger, verbose: bool = False) -> str:
+async def upload_image_to_imgur(image_path: str, logger: Logger) -> str:
     """
     Uploads an image to Imgur and returns the URL of the uploaded image.
 
     Parameters:
         image_path (str): The path to the image file to be uploaded.
         logger (Logger): The logger object for logging messages.
-        verbose (bool, optional): Whether to log verbose messages. Defaults to False.
 
     Returns:
         str: The URL of the uploaded image.
@@ -117,7 +114,7 @@ async def upload_image_to_imgur(image_path: str, logger: Logger, verbose: bool =
                 data = await response.json()
         except Exception as e:
             retest_interval = 300
-            if verbose:
+            if os.environ.get("VERBOSE") == "True":
                 logger.warning(f"Failed to upload image to imgur: {e}, retest in {retest_interval} seconds.")
             await asyncio.sleep(retest_interval)
             return ""
@@ -126,14 +123,13 @@ async def upload_image_to_imgur(image_path: str, logger: Logger, verbose: bool =
 
 
 @retrying.retry(wait_fixed=1000, stop_max_attempt_number=3)
-async def save_image_to_imgur(image_url: str, logger: Logger, verbose: bool = False):
+async def save_image_to_imgur(image_url: str, logger: Logger):
     """
     Save an image from the given URL to Imgur.
 
     Args:
         image_url (str): The URL of the image to be saved.
         logger (Logger): An instance of the logger to log messages.
-        verbose (bool, optional): Whether to print verbose messages. Defaults to False.
 
     Returns:
         str: The URL of the image saved on Imgur.
@@ -151,8 +147,8 @@ async def save_image_to_imgur(image_url: str, logger: Logger, verbose: bool = Fa
     with tempfile.NamedTemporaryFile(delete=False) as temp:
         temp.write(response.content)
         temp_file_path = temp.name
-    if verbose:
+    if os.environ.get("VERBOSE") == "True":
         logger.info(f"Download file to {temp_file_path}.")
-    imgur_url = await upload_image_to_imgur(temp_file_path, logger, verbose=verbose)
+    imgur_url = await upload_image_to_imgur(temp_file_path, logger)
     os.remove(temp_file_path)
     return imgur_url

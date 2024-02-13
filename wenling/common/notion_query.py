@@ -1,5 +1,3 @@
-import asyncio
-import datetime
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -9,10 +7,10 @@ from wenling.common.utils import Logger
 
 
 class NotionQuery:
-    def __init__(self, database_id: str, verbose: bool = False):
+    def __init__(self, database_id: str):
         self.database_id = database_id
-        self.verbose = verbose
-        self.logger = Logger(logger_name=os.path.basename(__file__), verbose=verbose)
+
+        self.logger = Logger(logger_name=os.path.basename(__file__))
         self.token = os.environ.get("NOTION_TOKEN")
         if not self.token:
             raise ValueError("Please set the Notion token in .env.")
@@ -34,7 +32,7 @@ class NotionQuery:
 
         """
         # Initialize the base structure with an "and" clause to hold all conditions
-        filter_conditions = {"and": []}
+        filter_conditions: Dict[str, List[Any]] = {"and": []}
 
         # Add conditions for start and end dates directly into the "and" clause
         if start_date:
@@ -45,7 +43,7 @@ class NotionQuery:
         # Prepare the "or" clause for tags if tags are provided
         if tags:
             # Initialize an "or" clause to hold tag conditions
-            tag_conditions = {"or": []}
+            tag_conditions: Dict[str, List[Any]] = {"or": []}
             # Add each tag to the "or" clause
             for tag in tags:
                 tag_conditions["or"].append({"property": "Tags", "multi_select": {"contains": tag}})
@@ -54,7 +52,7 @@ class NotionQuery:
 
         # Perform the query using the constructed filter conditions
         try:
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.info(f"Querying Notion database with filter conditions: {filter_conditions}")
             results = await self.notion.databases.query(
                 database_id=self.database_id, filter=filter_conditions if filter_conditions else None
@@ -64,7 +62,7 @@ class NotionQuery:
                 return []
             # Extract the page_ids from the results.
             page_ids = [page.get("id") for page in results.get("results")]
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.info(f"Retrieved {len(page_ids)} results.")
             return page_ids
         except Exception as e:
@@ -83,7 +81,7 @@ class NotionQuery:
         """
         # Query the contents of the page with the given page_id
         page = await self.notion.pages.retrieve(page_id=page_id)
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info(f"Retrieved page: {page}")
         # Extract the URL and title properties from the page
         url = page.get("properties").get("URL").get("rich_text")[0].get("text")

@@ -65,7 +65,7 @@ class NotionQuery:
             self.logger.error(f"Error querying Notion database: {e}")
             return []
 
-    async def query_page_contents(self, page_id: str) -> Tuple[str, str]:
+    async def query_page_contents(self, page_id: str) -> Tuple[str, str, str]:
         """
         Query the contents of the page with the given page_id.
 
@@ -73,15 +73,16 @@ class NotionQuery:
             page_id (str): The ID of the page to query.
 
         Returns:
-            Tuple[str, str]: A tuple containing the URL and title of the page.
+            Tuple[str, str, str]: A tuple containing the URL, title, and tags of the page.
         """
         # Query the contents of the page with the given page_id
-        self.logger.error(f"Querying page with ID: {page_id}")
         page = await self.notion.pages.retrieve(page_id=page_id)
         if self.verbose:
             self.logger.info(f"Retrieved page: {page}")
         # Extract the URL and title properties from the page
         url = page.get("properties").get("URL").get("rich_text")[0].get("text")
         title = page.get("properties").get("Title").get("title")[0].get("text").get("content")
+        tags_blob = page.get("properties").get("Tags").get("multi_select")
+        tags = [tag.get("name") for tag in tags_blob]
         # Return the URL and title as a tuple
-        return url, title
+        return url, title, tags

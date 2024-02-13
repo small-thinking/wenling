@@ -185,14 +185,14 @@ class NotionStorage:
                 properties=page_properties,
                 children=children[:100],
             )
-        except Exception as e:
-            self.logger.error(f"An error occurred while creating the page: {str(e)}")
+            if os.environ.get("VERBOSE") == "True":
+                self.logger.info("Page created.")
             if not response or "id" not in response:
                 raise ValueError("Failed to create the page.")
-        if os.environ.get("VERBOSE") == "True":
-            self.logger.info("Page created.")
-        # Return the page id
-        return response["id"]
+            # Return the page id
+            return response["id"]
+        except Exception as e:
+            self.logger.error(f"An error occurred while creating the page: {str(e)}")
 
     async def store(self, json_obj: Dict[str, Any]) -> str:
         """Store the data into Notion."""

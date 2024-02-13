@@ -22,7 +22,12 @@ class ArchiverOrchestrator:
             {
                 # Match url has mp.weixin.qq.com in it.
                 "match_regex": r"^https://mp\.weixin\.qq\.com/s/.*$",
-                "archiver": WechatArticleArchiver(),
+                "archiver": WechatArticleArchiver(name="WechatArticleArchiver"),
+            },
+            {
+                # Match url has substack.com in it.
+                "match_regex": r"^https://.*\.substack\.com/p/.*$",
+                "archiver": SubstackArticleArchiver(name="SubstackArticleArchiver"),
             },
         ]
         self.default_archiver = WebPageArchiver()
@@ -45,7 +50,7 @@ class ArchiverOrchestrator:
 class Archiver(ABC):
     """Archiver is a tool used to archive the bookmarked articles."""
 
-    def __init__(self, vendor_type: str = "openai", **kwargs):
+    def __init__(self, name: str, vendor_type: str = "openai", **kwargs):
         load_dotenv(override=True)
         self.api_key = os.getenv("ARCHIVER_API_KEY")
         self.logger = Logger(logger_name=os.path.basename(__file__))
@@ -54,7 +59,7 @@ class Archiver(ABC):
             self.model = OpenAIChatModel()
         else:
             raise NotImplementedError
-        self.name = self._set_name()
+        self.name = name
         self._extra_setup()
 
     def _extra_setup(self):
@@ -70,6 +75,7 @@ class Archiver(ABC):
         ---
         
         Some suggested tags:
+        0. No more than 3 tags.
         1. If this article is about building agent, please add the tag Agent.
         2. If this article is about LLM, please add the tag LLM.
         3. If this article is about deep learning in general, please add the tag Deep Learning.
@@ -94,10 +100,6 @@ class Archiver(ABC):
             self.logger.error(f"Error parsing the tags. Details: {str(e)}. Return empty tags.")
             return []
 
-    @abstractmethod
-    def _set_name(self) -> str:
-        pass
-
     def _consolidate_content(self, content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Merge the consecutive texts or code blocks into one. The max size of each block should be less than 2000."""
         if os.environ.get("VERBOSE") == "True":
@@ -112,7 +114,7 @@ class Archiver(ABC):
                         consolidated_content.append({"type": block["type"], "text": block["text"][i : i + 2000]})
                 elif consolidated_content and consolidated_content[-1]["type"] == block["type"]:
                     if len(consolidated_content[-1]["text"]) + len(block["text"]) < 2000:
-                        consolidated_content[-1]["text"] += "\n" + block["text"]
+                        consolidated_content[-1]["text"] += "\n\n" + block["text"]
                     else:
                         consolidated_content.append(block)
                 else:
@@ -140,12 +142,9 @@ class WechatArticleArchiver(Archiver):
     WechatArticleArchiver is a tool used to archive the bookmarked wechart articles.
     """
 
-    def __init__(self, vendor_type: str = "openai", **kwargs):
-        super().__init__(vendor_type=vendor_type)
+    def __init__(self, name: str, vendor_type: str = "openai", **kwargs):
+        super().__init__(name=name, vendor_type=vendor_type)
         self.root_css_selector = "div#img-content.rich_media_wrp"
-
-    def _set_name(self) -> str:
-        return "WechatArticleArchiver"
 
     def _parse_title(self, element_bs: BeautifulSoup) -> str:
         """Get the title from the first h1 element, put it into {"type": "h1", "text": <title>}."""
@@ -362,18 +361,11 @@ class WebPageArchiver(Archiver):
     WebPageArchiver is a tool used to archive the bookmarked web pages.
     """
 
-    def __init__(self, vendor_type: str = "openai", **kwargs):
-        super().__init__(vendor_type=vendor_type)
+    def __init__(self, name: str = "Webpage", vendor_type: str = "openai", **kwargs):
+        super().__init__(name=name, vendor_type=vendor_type)
         self.root_css_selector = "html"
         self.max_tokens = kwargs.get("max_tokens", 8192)
         self.temperature = kwargs.get("temperature", 0.0)
-        self._extra_setup()
-
-    def _extra_setup(self):
-        self._set_name()
-
-    def _set_name(self) -> str:
-        return "WebPageArchiver"
 
     def _parse_title(self, element_bs: BeautifulSoup) -> str:
         """Get the title from the head -> title element, og:title, or twitter:title meta tags."""
@@ -551,7 +543,7 @@ class WebPageArchiver(Archiver):
             tags = await self._parse_tags(paragraphs)
             tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
             self.logger.info(f"Auto-generate tags based on the contents...")
-            auto_tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
+            auto_tags = await self._auto_tagging(paragraphs)
             tags += auto_tags
             article_json_obj["properties"]["tags"] = tags
             if os.environ.get("VERBOSE") == "True":
@@ -561,3 +553,142 @@ class WebPageArchiver(Archiver):
             raise ValueError(f"Error parsing content. Details: {str(e)}")
         finally:
             return article_json_obj
+
+
+# Implement a class to handle substack articles.
+class SubstackArticleArchiver(Archiver):
+    def __init__(self, name: str, vendor_type: str = "openai", **kwargs):
+        super().__init__(name=name, vendor_type=vendor_type)
+        self.root_css_selector = "body"
+
+    def _parse_title(self, element_bs: BeautifulSoup) -> str:
+        """Get the title from a sub element h1 with class post-title."""
+        title_element = element_bs.select_one(".post-title")
+        if not title_element:
+            self.logger.warning("Cannot find title element.")
+            title = "Untitled"
+        else:
+            title = title_element.get_text().strip()
+        return title
+
+    def _parse_author(self, element_bs: BeautifulSoup) -> str:
+        """Get the author from a sub element with a hyperlink blob with class pencraft."""
+        author_element = element_bs.select_one(".pencraft")
+        if not author_element:
+            self.logger.warning("Cannot find author element.")
+            author = ""
+        else:
+            author = author_element.get_text().strip()
+        return author
+
+    def _parse_publish_time(self, element_bs: BeautifulSoup) -> Dict[str, str]:
+        """Get the publish date from a sub element with class pencraft pc-display-flex pc-gap-4 pc-reset."""
+        publish_time_element = element_bs.select_one(".pencraft.pc-display-flex.pc-gap-4.pc-reset")
+        if not publish_time_element:
+            raise ValueError("Cannot find publish time element.")
+        publish_time = publish_time_element.get_text().strip() if publish_time_element else "Not available"
+        return {"type": "h2", "text": publish_time}
+
+    def _parse_tags(self, element_bs: BeautifulSoup) -> List[str]:
+        """Do nothing."""
+        return []
+
+    def _parse_section(self, paragraph_tag: Tag, cache: Dict[str, Any]) -> List[Dict[str, Any]]:
+        # Each section can be paragraph (p), image (dive class=captioned-image-container), list (ol), subtitle (h2).
+        parsed_elements = []
+        try:
+            if paragraph_tag.name == "h1":
+                title = paragraph_tag.get_text().strip()
+                if title not in cache:
+                    parsed_elements.append({"type": "h1", "text": title})
+                    cache[title] = True
+            elif paragraph_tag.name == "h2":
+                subtitle = paragraph_tag.get_text().strip()
+                if subtitle not in cache:
+                    parsed_elements.append({"type": "h2", "text": subtitle})
+                    cache[subtitle] = True
+            elif paragraph_tag.name == "p":
+                # Get the text content.
+                text = paragraph_tag.get_text().strip()
+                if text:
+                    if text not in cache:
+                        parsed_elements.append({"type": "text", "text": text})
+                        cache[text] = True
+            elif paragraph_tag.name == "blockquote":
+                text = paragraph_tag.get_text().strip()
+                if text not in cache:
+                    parsed_elements.append({"type": "quote", "text": text})
+                    cache[text] = True
+            elif paragraph_tag.name in ["ul", "ol"]:
+                for idx, li in enumerate(paragraph_tag.find_all("li")):
+                    li_text = str(idx + 1) + ": " + li.get_text().strip()
+                    if li_text:
+                        if li_text not in cache:
+                            parsed_elements.append({"type": "text", "text": li_text})
+                            cache[li_text] = True
+            elif paragraph_tag.name == "div" and paragraph_tag.get("class") == "captioned-image-container":
+                # Find the href of the image from the attribute of <a>.
+                image_url = paragraph_tag.find("a")["href"]
+                if image_url not in cache:
+                    parsed_elements.append({"type": "image", "url": image_url})
+                    cache[image_url] = True
+            else:
+                content = paragraph_tag.get_text().strip()
+                if content:
+                    if content not in cache:
+                        parsed_elements.append({"type": f"{paragraph_tag.name}", "text": content})
+                        cache[content] = True
+        except Exception as e:
+            raise ValueError(f"Error parsing content. Details: {str(e)}")
+        return parsed_elements
+
+    def _parse_content(self, element_bs: BeautifulSoup) -> List[Dict[str, Any]]:
+        """Extract the image urls and all texts.
+        And then leverage LLM to structurize the content into a json blob.
+        """
+        if os.environ.get("VERBOSE") == "True":
+            self.logger.info("Extract the image urls and all texts...")
+        content_tag = element_bs.select_one("div.body.markup")
+        # Get the first level children, each is a section. And parse them one by one.
+        sections = content_tag.find_all(recursive=False)
+        if os.environ.get("VERBOSE") == "True":
+            self.logger.info(f"Total number of sections: {len(sections)}")
+        paragraphs: List[Dict[str, Any]] = []
+        cache: Dict[str, Any] = {}
+        for section in sections:
+            paragraphs.extend(self._parse_section(section, cache))
+        return paragraphs
+
+    async def _archive(self, url: str, notes: Optional[str] = None) -> Dict[str, Any]:
+        """Get the content block from the web page with the path div.single-post.
+        Parse the elements and put them into a json object with list of elements.
+        """
+        element = fetch_url_content(url=url, css_selector=self.root_css_selector)
+        element_bs = BeautifulSoup(element, "html.parser")
+        if not element:
+            raise ValueError(f"The url {url} does not have the element {self.root_css_selector}.")
+        try:
+            paragraphs: List[Dict[str, Any]] = self._parse_content(element_bs)
+            article_json_obj: Dict[str, Any] = {
+                "properties": {},
+                "children": paragraphs,
+            }
+            article_json_obj["properties"]["url"] = url
+            article_json_obj["properties"]["notes"] = notes if notes else ""
+            article_json_obj["properties"]["title"] = self._parse_title(element_bs=element_bs)
+            article_json_obj["properties"]["type"] = "Substack"
+            article_json_obj["properties"]["datetime"] = get_datetime()
+            author = self._parse_author(element_bs=element_bs)
+            tags = [] if not author else [author]
+            if os.environ.get("VERBOSE") == "True":
+                self.logger.info(f"Auto-generate tags based on the contents...")
+            auto_tags = await self._auto_tagging(paragraphs)
+            tags.extend(auto_tags)
+            article_json_obj["properties"]["tags"] = tags
+            if os.environ.get("VERBOSE") == "True":
+                json_object_str = json.dumps(article_json_obj, indent=2)
+                self.logger.info(f"Archived article: {json_object_str}")
+            return article_json_obj
+        except Exception as e:
+            self.logger.error(f"Error parsing content. Details: {str(e)}")
+            raise ValueError(f"Error parsing content. Details: {str(e)}")

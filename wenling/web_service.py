@@ -7,18 +7,19 @@ import os
 from typing import Optional
 
 import uvicorn
+from dotenv import load_dotenv  # type: ignore
 from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from wenling.archiver import ArchiverOrchestrator
 from wenling.common.notion_query import NotionQuery
-from wenling.common.utils import Logger, load_env
+from wenling.common.utils import Logger
 
 app = FastAPI()
 security = HTTPBearer()
 logger = Logger(logger_name=os.path.basename(__file__), verbose=True)
-load_env()
+load_dotenv(override=True)
 
 
 class ArchiveRequest(BaseModel):
@@ -69,7 +70,6 @@ async def archive_article(request: ArchiveRequest, api_key: str = Depends(get_ap
             raise HTTPException(status_code=404, detail="Corresponding archiver not found")
         return {"message": "Article archived successfully", "page_id": page_id}
     except Exception as e:
-        # Print stack trace.
         raise HTTPException(status_code=500, detail=f"Got the error: {str(e)}")
 
 

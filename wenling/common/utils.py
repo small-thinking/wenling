@@ -14,14 +14,6 @@ import requests  # type: ignore
 import retrying
 from bs4 import BeautifulSoup
 from colorama import Fore, ansi
-from dotenv import load_dotenv  # type: ignore
-
-
-def load_env(env_file_path: str = "") -> None:
-    if env_file_path:
-        load_env(env_file_path)
-    else:
-        load_dotenv()
 
 
 def get_datetime(timestamp: Optional[float] = None) -> str:
@@ -33,7 +25,7 @@ def get_datetime(timestamp: Optional[float] = None) -> str:
     Returns:
         str: The datetime string.
     """
-    timezone = pytz.timezone("Etc/GMT+8")
+    timezone = pytz.timezone("America/Los_Angeles")
     if not timestamp:
         timestamp = datetime.now().timestamp()
     return datetime.fromtimestamp(timestamp, timezone).strftime("%Y-%m-%d %H:%M:%S")

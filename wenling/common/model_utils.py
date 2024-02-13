@@ -3,8 +3,9 @@ from abc import ABC, abstractmethod
 
 import openai
 import retrying
+from dotenv import load_dotenv  # type: ignore
 
-from wenling.common.utils import Logger, load_env
+from wenling.common.utils import Logger
 
 
 class Model(ABC):
@@ -33,7 +34,7 @@ class OpenAIChatModel(Model):
 
     def __init__(self, *args, **kwargs):
         super().__init__(vendor_type="openai", *args, **kwargs)
-        load_env()
+        load_dotenv(override=True)
         self.client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
     @retrying.retry(stop_max_attempt_number=3)

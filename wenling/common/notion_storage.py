@@ -174,6 +174,7 @@ class NotionStorage:
             "Archive Date": {"start": properties["datetime"]},
             "Tags": [{"name": tag} for tag in properties.get("tags", [])],
             "Status": {"name": properties.get("status", "Archived")},
+            "Notes": [{"type": "text", "text": {"content": properties.get("notes", "")}}],
             "URL": [{"type": "text", "text": {"content": properties.get("url", "")}}],
         }
         children = await self._create_page_blocks(json_obj["children"])

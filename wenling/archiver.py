@@ -1,7 +1,6 @@
 """
 """
 
-import asyncio
 import json
 import os
 import re
@@ -9,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
 from bs4 import BeautifulSoup, Tag
+from dotenv import load_dotenv  # type: ignore
 
 from wenling.common.model_utils import OpenAIChatModel
 from wenling.common.notion_storage import NotionStorage
@@ -28,13 +28,13 @@ class ArchiverOrchestrator:
         ]
         self.default_archiver = WebPageArchiver(verbose=verbose)
 
-    async def archive(self, url: str, notes: str = None) -> str:
+    async def archive(self, url: str, notes: Optional[str] = None) -> str:
         """Match the url with pattern and find the corresponding archiver."""
         for archiver in self.archivers:
             if re.match(pattern=archiver["match_regex"], string=url):
                 if self.verbose:
-                    self.logger.info(f"Archive url with archiver {archiver['archiver'].name}...")
-                page_id = await archiver["archiver"].archive(url)
+                    self.logger.info(f"Archive url with archiver {archiver['archiver'].name} with notes {notes}...")
+                page_id = await archiver["archiver"].archive(url=url, notes=notes)
                 return page_id
         # Match to general web archiver by default.
         if self.verbose:
@@ -47,7 +47,7 @@ class Archiver(ABC):
     """Archiver is a tool used to archive the bookmarked articles."""
 
     def __init__(self, vendor_type: str = "openai", verbose: bool = False, **kwargs):
-        load_env()
+        load_dotenv(override=True)
         self.api_key = os.getenv("ARCHIVER_API_KEY")
         self.verbose = verbose
         self.logger = Logger(logger_name=os.path.basename(__file__), verbose=verbose)
@@ -57,8 +57,6 @@ class Archiver(ABC):
         else:
             raise NotImplementedError
         self.name = self._set_name()
-        if "auto-tagging" in kwargs:
-            self.auto_tagging = kwargs["auto-tagging"] or True
         self._extra_setup()
 
     def _extra_setup(self):
@@ -66,8 +64,6 @@ class Archiver(ABC):
 
     async def _auto_tagging(self, paragraphs: List[Dict[str, Any]]) -> List[str]:
         """Leverage the LLM to auto-generate the tags based on the contents."""
-        if self.verbose:
-            self.logger.info(f"Generate tags based on the contents...")
         contents_str = "\n".join([paragraph.get("text", "") for paragraph in paragraphs])
         prompt = f"""
         Please help generate the tags based on the contents below:
@@ -75,17 +71,26 @@ class Archiver(ABC):
         {contents_str}
         ---
         
+        Some suggested tags:
+        1. If this article is about building agent, please add the tag Agent.
+        2. If this article is about LLM, please add the tag LLM.
+        3. If this article is about deep learning in general, please add the tag Deep Learning.
+        4. If this article is about tech philosophy, please add the tag Tech Philosophy.
+        5. Please use any other tags that you think are relevant.
+        
         Please generate the tags in the same language as the contents, and return in below json format:
         {{
             "tags": ["tag1", "tag2", "tag3"]
         }}
         """
-        json_response_str = await self.model.inference(
+        json_response_str = self.model.inference(
             user_prompt=prompt, max_tokens=256, temperature=0.0, response_format="json_object"
         )
         try:
             json_obj = json.loads(json_response_str)
             tags = json_obj.get("tags", [])
+            if self.verbose:
+                self.logger.info(f"Auto-generated tags: {tags}")
             return tags
         except Exception as e:
             self.logger.error(f"Error parsing the tags. Details: {str(e)}. Return empty tags.")
@@ -113,14 +118,14 @@ class Archiver(ABC):
                 consolidated_content.append(block)
         return consolidated_content
 
-    async def archive(self, url: str, notes: str = None) -> str:
+    async def archive(self, url: str, notes: Optional[str] = None) -> str:
         if not check_url_exists(url):
             raise ValueError(f"The url {url} does not exist.")
         article_json_obj = await self._archive(url=url, notes=notes)
         return await self.notion_store.store(json_obj=article_json_obj)
 
     @abstractmethod
-    async def _archive(self, url: str, notes: str = None) -> Dict[str, Any]:
+    async def _archive(self, url: str, notes: Optional[str] = None) -> Dict[str, Any]:
         pass
 
     def list_archived(self) -> List[str]:
@@ -153,10 +158,13 @@ class WechatArticleArchiver(Archiver):
         """Get the author name from a sub element with class "rich_media_meta rich_media_meta_text",
         put it into {"type": "h2", "text": <author_name>}.
         """
+        author = []
         author_element = element_bs.select_one(".rich_media_meta.rich_media_meta_text")
         if not author_element:
-            raise ValueError("Cannot find author element.")
-        author = author_element.get_text().strip()
+            if self.verbose:
+                self.logger.warning("Cannot find author element.")
+        else:
+            author = author_element.get_text().strip()
         return author
 
     def _parse_publish_time(self, element_bs: BeautifulSoup) -> Dict[str, str]:
@@ -173,10 +181,13 @@ class WechatArticleArchiver(Archiver):
         """Get the tags from a sub elements (not direct sub) each with class "article-tag__item",
         and put them into {"type": "text", "text": <comma separated tags>}
         """
+        tags = []
         tags_element = element_bs.select(".article-tag__item")
         if not tags_element:
-            raise ValueError("Cannot find tags element.")
-        tags = [tag.get_text().strip() for tag in tags_element]
+            if self.verbose:
+                self.logger.warning("Cannot find tags element.")
+        else:
+            tags = [tag.get_text().strip() for tag in tags_element]
         return tags
 
     def _parse_paragraph(self, paragraph_tag: Tag, cache: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -301,7 +312,7 @@ class WechatArticleArchiver(Archiver):
 
         return content_json_obj
 
-    async def _archive(self, url: str, notes: str = None) -> Dict[str, Any]:
+    async def _archive(self, url: str, notes: Optional[str] = None) -> Dict[str, Any]:
         """Get the content block from the web page with the path div#img-content.rich_media_wrp.
         Parse the elements and put them into a json object with list of elements.
         """
@@ -322,27 +333,22 @@ class WechatArticleArchiver(Archiver):
             article_json_obj["properties"]["title"] = self._parse_title(element_bs=element_bs)
             article_json_obj["properties"]["type"] = "微信"
             # Convert date time to needed format.
-            try:
-                archive_datetime = get_datetime()
-                archive_datetime_pst = archive_datetime.astimezone(pytz.timezone("America/Los_Angeles"))
-                archive_datetime_pst_formatted = archive_datetime_pst.strftime("%Y-%m-%d %H:%M")
-                article_json_obj["properties"]["datetime"] = archive_datetime_pst_formatted
-            except Exception as e:
-                raise ValueError(f"Error setting archive datetime. Details: {str(e)}")
+            article_json_obj["properties"]["datetime"] = get_datetime()
             tags = self._parse_tags(element_bs=element_bs) + [self._parse_author(element_bs=element_bs)]
-            tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
-            if self.auto_tagging:
-                auto_tags = await self._auto_tagging(paragraphs)
-                auto_tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
-                tags += auto_tags
-                article_json_obj["properties"]["tags"] = tags
+            if tags:
+                tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
             else:
-                article_json_obj["properties"]["tags"] = tags
+                tags = []
+            self.logger.info(f"Auto-generate tags based on the contents...")
+            auto_tags = await self._auto_tagging(paragraphs)
+            tags.extend(auto_tags)
+            article_json_obj["properties"]["tags"] = tags
 
             if self.verbose:
                 json_object_str = json.dumps(article_json_obj, indent=2)
                 self.logger.info(f"Archived article: {json_object_str}")
         except Exception as e:
+            self.logger.error(f"Error parsing content. Details: {str(e)}")
             raise ValueError(f"Error parsing content. Details: {str(e)}")
         finally:
             return article_json_obj
@@ -513,7 +519,7 @@ class WebPageArchiver(Archiver):
             self.logger.error(f"Error parsing the tags. Details: {str(e)}. Return empty tags.")
             return []
 
-    async def _archive(self, url: str, notes: str = None) -> Dict[str, Any]:
+    async def _archive(self, url: str, notes: Optional[str] = None) -> Dict[str, Any]:
         """Get the content block from the web page.
         Parse the elements and put them into a json object with list of elements.
         """
@@ -538,6 +544,9 @@ class WebPageArchiver(Archiver):
             # Leverage LLM to generate the tags based on the article json obj contents.
             tags = await self._parse_tags(contents)
             tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
+            self.logger.info(f"Auto-generate tags based on the contents...")
+            auto_tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
+            tags += auto_tags
             article_json_obj["properties"]["tags"] = tags
             if self.verbose:
                 json_object_str = json.dumps(article_json_obj, indent=2)

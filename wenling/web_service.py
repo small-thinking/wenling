@@ -2,28 +2,40 @@
 Run with: clear; python -m wenling.scripts.fetch_web_page
 """
 
+import datetime
 import os
+from typing import Optional
 
 import uvicorn
+from dotenv import load_dotenv  # type: ignore
 from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from wenling.archiver import ArchiverOrchestrator
-from wenling.common.utils import Logger, load_env
+from wenling.common.notion_query import NotionQuery
+from wenling.common.utils import Logger
 
 app = FastAPI()
 security = HTTPBearer()
 logger = Logger(logger_name=os.path.basename(__file__), verbose=True)
-load_env()
+load_dotenv(override=True)
 
 
 class ArchiveRequest(BaseModel):
     url: str
+    notes: Optional[str]
 
 
 class GenerateArticleRequest(BaseModel):
     date_range: str
+    tags: list[str]
+
+
+class QueryArticleRequest(BaseModel):
+    database_id: str
+    start_date: str
+    end_date: str
     tags: list[str]
 
 
@@ -53,12 +65,11 @@ async def archive_article(request: ArchiveRequest, api_key: str = Depends(get_ap
     try:
         # Log the params.
         logger.info(f"Archive url: {request.url}")
-        page_id = await orchestrator.archive(request.url)
+        page_id = await orchestrator.archive(url=request.url, notes=request.notes)
         if page_id is None:
             raise HTTPException(status_code=404, detail="Corresponding archiver not found")
         return {"message": "Article archived successfully", "page_id": page_id}
     except Exception as e:
-        # Print stack trace.
         raise HTTPException(status_code=500, detail=f"Got the error: {str(e)}")
 
 
@@ -67,6 +78,23 @@ async def generate_article(request: GenerateArticleRequest, api_key: str = Depen
     # Dummy implementation for generating an article
     logger.info(f"Generate article with params: {request}")
     return {"message": "Article generated successfully", "page_id": "123456789"}
+
+
+@app.post("/query-pages/")
+async def query_article(request: QueryArticleRequest, api_key: str = Depends(get_api_key)):
+    notion_query = NotionQuery(database_id=request.database_id, verbose=True)
+    # Set default start date and end date if not provided
+    if not request.start_date:
+        request.start_date = str(datetime.date.today())
+    if not request.end_date:
+        request.end_date = str(datetime.date.today())
+    pages = await notion_query.query_pages(start_date=request.start_date, end_date=request.end_date, tags=request.tags)
+    # Retrieve the title and URL of each page.
+    page_data = []
+    for page_id in pages:
+        url, title, tags = await notion_query.query_page_contents(page_id)
+        page_data.append({"title": title, "url": url, "tags": tags})
+    return {"message": "Query successful", "pages": page_data}
 
 
 if __name__ == "__main__":

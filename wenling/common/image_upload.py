@@ -10,9 +10,10 @@ import aiohttp
 import flickrapi
 import requests
 import retrying
+from dotenv import load_dotenv  # type: ignore
 from flickrapi.auth import FlickrAccessToken
 
-from wenling.common.utils import Logger, load_env
+from wenling.common.utils import Logger
 
 
 async def upload_image_to_flickr(
@@ -34,7 +35,7 @@ async def upload_image_to_flickr(
     Raises:
     - Exception: If there is an error in uploading or parsing the response.
     """
-    load_env()
+    load_dotenv(override=True)
 
     api_key = os.environ.get("FLICKR_API_KEY")
     api_secret = os.environ.get("FLICKR_SECRET")

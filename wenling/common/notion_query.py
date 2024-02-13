@@ -1,5 +1,5 @@
 import os
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from notion_client import AsyncClient
 
@@ -32,7 +32,7 @@ class NotionQuery:
 
         """
         # Initialize the base structure with an "and" clause to hold all conditions
-        filter_conditions = {"and": []}
+        filter_conditions: Dict[str, List[Any]] = {"and": []}
 
         # Add conditions for start and end dates directly into the "and" clause
         if start_date:
@@ -43,7 +43,7 @@ class NotionQuery:
         # Prepare the "or" clause for tags if tags are provided
         if tags:
             # Initialize an "or" clause to hold tag conditions
-            tag_conditions = {"or": []}
+            tag_conditions: Dict[str, List[Any]] = {"or": []}
             # Add each tag to the "or" clause
             for tag in tags:
                 tag_conditions["or"].append({"property": "Tags", "multi_select": {"contains": tag}})

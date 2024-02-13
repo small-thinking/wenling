@@ -81,7 +81,7 @@ async def generate_article(request: GenerateArticleRequest, api_key: str = Depen
 
 @app.post("/query-article/")
 async def query_article(request: QueryArticleRequest, api_key: str = Depends(get_api_key)):
-    notion_query = NotionQuery(database_id=os.environ.get("NOTION_DATABASE_ID"))
+    notion_query = NotionQuery(database_id=os.environ.get("NOTION_DATABASE_ID", ""))
     # Set default start date and end date if not provided
     if not request.start_date:
         request.start_date = str(datetime.date.today())

@@ -30,7 +30,7 @@ class OpenAIChatModel(Model):
     """
 
     client: openai.OpenAI
-    model_type: str = "gpt-3.5-turbo-1106"
+    model_type: str = "gpt-3.5-turbo-0125"
 
     def __init__(self, *args, **kwargs):
         super().__init__(vendor_type="openai", *args, **kwargs)

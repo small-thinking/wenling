@@ -65,7 +65,7 @@ class NotionQuery:
             self.logger.error(f"Error querying Notion database: {e}")
             return []
 
-    async def query_page_contents(self, page_id: str) -> Tuple[str, str, str]:
+    async def query_page_contents(self, page_id: str) -> Tuple[str, str, List[str]]:
         """
         Query the contents of the page with the given page_id.
 

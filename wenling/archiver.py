@@ -105,7 +105,12 @@ class Archiver(ABC):
         consolidated_content: List[Dict[str, Any]] = []
         for block in content:
             if block["type"] in ["text", "code"]:
-                if consolidated_content and consolidated_content[-1]["type"] == block["type"]:
+                if len(block["text"]) >= 2000:
+                    if os.environ.get("VERBOSE") == "True":
+                        self.logger.warning(f"The block is too long, chunk to size of 2000.")
+                    for i in range(0, len(block["text"]), 2000):
+                        consolidated_content.append({"type": block["type"], "text": block["text"][i : i + 2000]})
+                elif consolidated_content and consolidated_content[-1]["type"] == block["type"]:
                     if len(consolidated_content[-1]["text"]) + len(block["text"]) < 2000:
                         consolidated_content[-1]["text"] += "\n" + block["text"]
                     else:
@@ -537,10 +542,13 @@ class WebPageArchiver(Archiver):
             article_json_obj["properties"]["title"] = self._parse_title(element_bs=element_bs)
             article_json_obj["properties"]["type"] = "网页"
             article_json_obj["properties"]["datetime"] = get_datetime()
-            contents = await self._parse_content(element_bs=element_bs)
-            article_json_obj["children"] = contents
+            paragraphs = await self._parse_content(
+                element_bs=element_bs
+            )  # Consolidate the consecutive texts or code blocks into one.
+            paragraphs = self._consolidate_content(paragraphs)
+            article_json_obj["children"] = paragraphs
             # Leverage LLM to generate the tags based on the article json obj contents.
-            tags = await self._parse_tags(contents)
+            tags = await self._parse_tags(paragraphs)
             tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]
             self.logger.info(f"Auto-generate tags based on the contents...")
             auto_tags = [tag.replace("#", "") for tag in tags if len(tag) > 1]

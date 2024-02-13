@@ -15,7 +15,6 @@ class NotionStorage:
     """Store the data into notion knowledge base."""
 
     def __init__(self, image_upload_per_batch: int = 10):
-
         self.token = os.environ.get("NOTION_TOKEN")
         if not self.token:
             raise ValueError("Please set the Notion token in .env.")
@@ -180,16 +179,16 @@ class NotionStorage:
         children = await self._create_page_blocks(json_obj["children"])
         if os.environ.get("VERBOSE") == "True":
             self.logger.info("Create page...")
-        response = await self.notion.pages.create(
-            parent={"type": "database_id", "database_id": database_id},
-            properties=page_properties,
-            children=children[:100],
-        )
-        # If not response 200, print the error.
-        if response.get("status") != 200:
-            self.logger.error(f"Failed to create the page: {response}")
-        if "id" not in response:
-            raise ValueError("Failed to create the page.")
+        try:
+            response = await self.notion.pages.create(
+                parent={"type": "database_id", "database_id": database_id},
+                properties=page_properties,
+                children=children[:100],
+            )
+        except Exception as e:
+            self.logger.error(f"An error occurred while creating the page: {str(e)}")
+            if not response or "id" not in response:
+                raise ValueError("Failed to create the page.")
         if os.environ.get("VERBOSE") == "True":
             self.logger.info("Page created.")
         # Return the page id

@@ -33,7 +33,6 @@ class GenerateArticleRequest(BaseModel):
 
 
 class QueryArticleRequest(BaseModel):
-    database_id: str
     start_date: str
     end_date: str
     tags: list[str]
@@ -80,9 +79,9 @@ async def generate_article(request: GenerateArticleRequest, api_key: str = Depen
     return {"message": "Article generated successfully", "page_id": "123456789"}
 
 
-@app.post("/query-pages/")
+@app.post("/query-article/")
 async def query_article(request: QueryArticleRequest, api_key: str = Depends(get_api_key)):
-    notion_query = NotionQuery(database_id=request.database_id, verbose=True)
+    notion_query = NotionQuery(database_id=os.environ.get("NOTION_DATABASE_ID"), verbose=True)
     # Set default start date and end date if not provided
     if not request.start_date:
         request.start_date = str(datetime.date.today())
@@ -94,7 +93,7 @@ async def query_article(request: QueryArticleRequest, api_key: str = Depends(get
     for page_id in pages:
         url, title, tags = await notion_query.query_page_contents(page_id)
         page_data.append({"title": title, "url": url, "tags": tags})
-    return {"message": "Query successful", "pages": page_data}
+    return {"message": "Query successful", "articles": page_data}
 
 
 if __name__ == "__main__":

@@ -53,15 +53,17 @@ class NotionQuery:
             results = await self.notion.databases.query(
                 database_id=self.database_id, filter={"and": filter_conditions} if filter_conditions else None
             )
+            if not results:
+                self.logger.info("No results found.")
+                return []
+            # Extract the page_ids from the results.
+            page_ids = [page.get("id") for page in results.get("results")]
             if self.verbose:
-                self.logger.info(f"Query {len(results)} results.")
+                self.logger.info(f"Retrieved {len(page_ids)} results.")
+            return page_ids
         except Exception as e:
             self.logger.error(f"Error querying Notion database: {e}")
             return []
-        if not results:
-            self.logger.info("No results found.")
-            return []
-        return results
 
     async def query_page_contents(self, page_id: str) -> Tuple[str, str]:
         """
@@ -74,11 +76,12 @@ class NotionQuery:
             Tuple[str, str]: A tuple containing the URL and title of the page.
         """
         # Query the contents of the page with the given page_id
+        self.logger.error(f"Querying page with ID: {page_id}")
         page = await self.notion.pages.retrieve(page_id=page_id)
-
+        if self.verbose:
+            self.logger.info(f"Retrieved page: {page}")
         # Extract the URL and title properties from the page
-        url = page.get("properties").get("URL").get("url")
-        title = page.get("properties").get("Title").get("title")
-
+        url = page.get("properties").get("URL").get("rich_text")[0].get("text")
+        title = page.get("properties").get("Title").get("title")[0].get("text").get("content")
         # Return the URL and title as a tuple
         return url, title

@@ -89,7 +89,12 @@ async def query_article(request: QueryArticleRequest, api_key: str = Depends(get
     if not request.end_date:
         request.end_date = str(datetime.date.today())
     pages = await notion_query.query_pages(start_date=request.start_date, end_date=request.end_date, tags=request.tags)
-    return {"message": "Query successful", "pages": pages}
+    # Retrieve the title and URL of each page.
+    page_data = []
+    for page_id in pages:
+        url, title = await notion_query.query_page_contents(page_id)
+        page_data.append({"title": title, "url": url})
+    return {"message": "Query successful", "pages": page_data}
 
 
 if __name__ == "__main__":

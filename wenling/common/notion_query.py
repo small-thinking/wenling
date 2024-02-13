@@ -33,25 +33,31 @@ class NotionQuery:
             List[str]: A list of page IDs that match the query.
 
         """
+        # Initialize the base structure with an "and" clause to hold all conditions
+        filter_conditions = {"and": []}
 
-        # Construct the filter conditions based on the start and end dates
-        filter_conditions = []
+        # Add conditions for start and end dates directly into the "and" clause
         if start_date:
-            filter_conditions.append({"property": "Archive Date", "date": {"on_or_after": start_date}})
+            filter_conditions["and"].append({"property": "Archive Date", "date": {"on_or_after": start_date}})
         if end_date:
-            filter_conditions.append({"property": "Archive Date", "date": {"on_or_before": end_date}})
+            filter_conditions["and"].append({"property": "Archive Date", "date": {"on_or_before": end_date}})
 
-        # Add filter conditions for tags if provided
+        # Prepare the "or" clause for tags if tags are provided
         if tags:
+            # Initialize an "or" clause to hold tag conditions
+            tag_conditions = {"or": []}
+            # Add each tag to the "or" clause
             for tag in tags:
-                filter_conditions.append({"property": "Tags", "multi_select": {"contains": tag}})
+                tag_conditions["or"].append({"property": "Tags", "multi_select": {"contains": tag}})
+            # Add the "or" clause for tags to the main "and" clause if there are tags
+            filter_conditions["and"].append(tag_conditions)
 
         # Perform the query using the constructed filter conditions
         try:
             if self.verbose:
                 self.logger.info(f"Querying Notion database with filter conditions: {filter_conditions}")
             results = await self.notion.databases.query(
-                database_id=self.database_id, filter={"and": filter_conditions} if filter_conditions else None
+                database_id=self.database_id, filter=filter_conditions if filter_conditions else None
             )
             if not results:
                 self.logger.info("No results found.")

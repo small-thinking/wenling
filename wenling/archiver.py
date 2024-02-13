@@ -158,7 +158,7 @@ class WechatArticleArchiver(Archiver):
         """Get the author name from a sub element with class "rich_media_meta rich_media_meta_text",
         put it into {"type": "h2", "text": <author_name>}.
         """
-        author = []
+        author = ""
         author_element = element_bs.select_one(".rich_media_meta.rich_media_meta_text")
         if not author_element:
             if self.verbose:

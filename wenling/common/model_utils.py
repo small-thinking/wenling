@@ -15,9 +15,9 @@ class Model(ABC):
 
     vendor_type: str
 
-    def __init__(self, vendor_type: str, verbose: bool = False):
+    def __init__(self, vendor_type: str):
         self.vendor_type = vendor_type
-        self.logger = Logger(logger_name=os.path.basename(__file__), verbose=verbose)
+        self.logger = Logger(logger_name=os.path.basename(__file__))
 
     @abstractmethod
     def inference(self, *args, **kwargs):

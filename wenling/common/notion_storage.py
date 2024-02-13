@@ -14,16 +14,16 @@ from wenling.common.utils import Logger
 class NotionStorage:
     """Store the data into notion knowledge base."""
 
-    def __init__(self, image_upload_per_batch: int = 10, verbose: bool = False):
-        self.verbose = verbose
+    def __init__(self, image_upload_per_batch: int = 10):
+
         self.token = os.environ.get("NOTION_TOKEN")
         if not self.token:
             raise ValueError("Please set the Notion token in .env.")
         self.notion = AsyncClient(auth=self.token)
         self.root_page_id = os.environ.get("NOTION_ROOT_PAGE_ID")
         self.image_upload_per_batch = image_upload_per_batch
-        self.logger = Logger(os.path.basename(__file__), verbose=verbose)
-        if self.verbose:
+        self.logger = Logger(os.path.basename(__file__))
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Notion storage initialized.")
 
     async def _get_or_create_database(self) -> str:
@@ -32,12 +32,12 @@ class NotionStorage:
         results = results.get("results")
         if len(results):
             database_id = results[0]["id"]
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.info(f"Database {database_id} already exists.")
             return results[0]["id"]
         else:
             # Create a new database.
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.info(f"Database for page {self.root_page_id} does not exist. Creating a new one...")
             parent = {"page_id": self.root_page_id}
             properties: Dict[str, Any] = {
@@ -53,7 +53,7 @@ class NotionStorage:
                 title=[{"type": "text", "text": {"content": "Wenling Archive"}}],
                 properties=properties,
             )
-            if self.verbose:
+            if os.environ.get("VERBOSE") == "True":
                 self.logger.info("Database created.")
             return response["id"]
 
@@ -62,7 +62,7 @@ class NotionStorage:
         The blocks is expected to be a list of dicts.
         """
         page_contents: List[Dict[str, Any]] = []
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Creating blocks in the page...")
         # Use a conter of image to control the pace of uploading images. Set rate limit to
         image_counter = 0
@@ -94,10 +94,10 @@ class NotionStorage:
             elif block.get("type") in ["image", "img"]:
                 image_counter += 1
                 if image_counter % self.image_upload_per_batch == 0:
-                    if self.verbose:
+                    if os.environ.get("VERBOSE") == "True":
                         self.logger.info(f"Sleeping for 60 seconds to avoid rate limit...")
                     await asyncio.sleep(60)
-                image_url = await save_image_to_imgur(image_url=block["url"], logger=self.logger, verbose=self.verbose)
+                image_url = await save_image_to_imgur(image_url=block["url"], logger=self.logger)
                 # image_url = await upload_image_to_flickr(
                 #     image_url=block["url"],
                 #     title="placeholder title",
@@ -178,28 +178,31 @@ class NotionStorage:
             "URL": [{"type": "text", "text": {"content": properties.get("url", "")}}],
         }
         children = await self._create_page_blocks(json_obj["children"])
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Create page...")
         response = await self.notion.pages.create(
             parent={"type": "database_id", "database_id": database_id},
             properties=page_properties,
             children=children[:100],
         )
+        # If not response 200, print the error.
+        if response.get("status") != 200:
+            self.logger.error(f"Failed to create the page: {response}")
         if "id" not in response:
             raise ValueError("Failed to create the page.")
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Page created.")
         # Return the page id
         return response["id"]
 
     async def store(self, json_obj: Dict[str, Any]) -> str:
         """Store the data into Notion."""
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Storing data into Notion.")
         database_id = os.environ.get("NOTION_DATABASE_ID") or await self._get_or_create_database()
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info(f"Database id: {database_id}")
         page_id = await self._add_to_database(database_id, json_obj)
-        if self.verbose:
+        if os.environ.get("VERBOSE") == "True":
             self.logger.info("Data stored into Notion.")
         return page_id

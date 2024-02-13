@@ -1,14 +1,10 @@
-import asyncio
 import inspect
 import logging
 import os
-import ssl
-import tempfile
 import threading
 from datetime import datetime
 from typing import Any, Optional
 
-import aiohttp
 import pytz  # type: ignore
 import requests  # type: ignore
 import retrying
@@ -83,10 +79,9 @@ class Logger:
                 cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, logger_name: str, verbose: bool = True, level: Any = logging.INFO):
+    def __init__(self, logger_name: str, level: Any = logging.INFO):
         if not hasattr(self, "logger"):
             self.logger = logging.getLogger(logger_name)
-            self.verbose = verbose
             self.logger.setLevel(level=level)
             self.formatter = logging.Formatter(
                 "%(asctime)s %(levelname)s %(name)s %(message)s (%(filename)s:%(lineno)d)"
@@ -100,7 +95,7 @@ class Logger:
         print(color + message + Fore.RESET, flush=True)
 
     def debug(self, message: str) -> None:
-        if not self.verbose:
+        if not os.environ.get("VERBOSE") == "True":
             return
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]
@@ -108,7 +103,7 @@ class Logger:
         self.logger.debug(Fore.MAGENTA + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)
 
     def info(self, message: str) -> None:
-        if not self.verbose:
+        if not os.environ.get("VERBOSE") == "True":
             return
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]
@@ -116,7 +111,7 @@ class Logger:
         self.logger.info(Fore.BLACK + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)
 
     def error(self, message: str) -> None:
-        if not self.verbose:
+        if not os.environ.get("VERBOSE") == "True":
             return
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]
@@ -124,7 +119,7 @@ class Logger:
         self.logger.error(Fore.RED + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)
 
     def warning(self, message: str) -> None:
-        if not self.verbose:
+        if not os.environ.get("VERBOSE") == "True":
             return
         caller_frame = inspect.stack()[1]
         caller_name = caller_frame[3]

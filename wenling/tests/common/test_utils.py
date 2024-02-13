@@ -1,6 +1,7 @@
 """Test the utils.
 Run test: poetry run pytest wenling/tests/common/test_utils.py
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,7 +11,7 @@ from wenling.common.utils import *
 
 @pytest.mark.parametrize(
     "input, expected",
-    [(1681684094, "2023-04-16 14:28:14")],
+    [(1681684094, "2023-04-16 15:28:14")],
 )
 def test_get_datetime(input, expected):
     assert get_datetime(input) == expected

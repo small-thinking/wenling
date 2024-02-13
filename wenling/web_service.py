@@ -24,7 +24,7 @@ load_dotenv(override=True)
 
 class ArchiveRequest(BaseModel):
     url: str
-    notes: Optional[str]
+    notes: str = ""
 
 
 class GenerateArticleRequest(BaseModel):

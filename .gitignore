@@ -133,3 +133,4 @@ test_scripts
 scripts
 temp/*
 autogen_config.json
+**/gpt_action_spec.yaml

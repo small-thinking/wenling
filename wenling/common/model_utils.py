@@ -84,15 +84,16 @@ class OpenAIChatModel(Model):
         return result
 
 
-def pdf_paper_summary(pdf_url: str, truncate_size: int = 4000):
+def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 4000):
     try:
         # Download PDF.
+        logger.info(f"Downloading PDF from {pdf_url}...")
         pdf_path = download_pdf(pdf_url)
         pdf_path = os.path.expanduser(pdf_path)
         # Parse PDF into paragraphs.
+        logger.info(f"Partitioning PDF into paragraphs...")
         elements = partition_pdf(
             filename=pdf_path,
-            infer_table_structure=True,
             strategy="fast",
         )
 
@@ -102,6 +103,7 @@ def pdf_paper_summary(pdf_url: str, truncate_size: int = 4000):
 
         # Concatenate paragraphs into a single string
         text = "\n".join(paragraphs.values())[:truncate_size]
+        logger.info("Start to summarize the paper...")
         openai = OpenAIChatModel()
         sys_prompt = """
             You will receive the paper text snippets (may have some noise text). Please return the paper according to the following rules for each paper name or url.
@@ -117,7 +119,7 @@ def pdf_paper_summary(pdf_url: str, truncate_size: int = 4000):
             
             Extract a TL;DR of the content in 50 words or less, including who is presenting and the content being discussed into a section called SUMMARY.
 
-            AUTHOR Section: List the first 2 authors and other notable authors, each with their affiliation.
+            AUTHOR Section: List of string includes the first 2 authors and other notable authors, each with their affiliation in parenthesis.
 
             Extract the primary paper unique contribution into a bulleted list of no more than 50 words per bullet into a section called CONTRIBUTIONS.
 
@@ -152,6 +154,15 @@ def pdf_paper_summary(pdf_url: str, truncate_size: int = 4000):
 
             OUTPUT INSTRUCTIONS
             Create the output using the formatting above. And put them into a json format. And each blob of text should be in markdown format.
+            For example:
+            {{
+                "title": "The title of the paper",
+                "authors": "The authors of the paper",
+                "summary": "The summary of the paper",
+                "contributions": "The contributions of the paper",
+                "experiment": "The experiment of the paper",
+                "conclusion": "The conclusion of the paper"
+            }}
             
             The output should have the keys of title, authors, summary, contributions, experiment, conclusion.
         """

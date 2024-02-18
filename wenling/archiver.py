@@ -74,23 +74,23 @@ class Archiver(ABC):
         """Leverage the LLM to auto-generate the tags based on the contents."""
         contents_str = "\n".join([paragraph.get("text", "") for paragraph in paragraphs if type(paragraph) == dict])
         prompt = f"""
-        Please help generate the tags based on the contents below:
-        ---
-        {contents_str}
-        ---
-        
-        Some suggested tags:
-        0. No more than 3 tags.
-        1. If this article is about building agent, please add the tag Agent.
-        2. If this article is about LLM, please add the tag LLM.
-        3. If this article is about deep learning in general, please add the tag Deep Learning.
-        4. If this article is about tech philosophy, please add the tag Tech Philosophy.
-        5. Please use any other tags that you think are relevant.
-        
-        Please generate the tags in the same language as the contents, and return in below json format:
-        {{
-            "tags": ["tag1", "tag2", "tag3"]
-        }}
+            Please help generate the tags based on the contents below:
+            ---
+            {contents_str}
+            ---
+            
+            Some suggested tags:
+            0. No more than 3 tags.
+            1. If this article is about building agent, please add the tag Agent.
+            2. If this article is about LLM, please add the tag LLM.
+            3. If this article is about deep learning in general, please add the tag Deep Learning.
+            4. If this article is about tech philosophy, please add the tag Tech Philosophy.
+            5. Please use any other tags that you think are relevant.
+            
+            Please generate the tags in the same language as the contents, and return in below json format:
+            {{
+                "tags": ["tag1", "tag2", "tag3"]
+            }}
         """
         json_response_str = self.model.inference(
             user_prompt=prompt, max_tokens=256, temperature=0.0, response_format="json_object"
@@ -708,7 +708,8 @@ class ArxivPaperArchiver(Archiver):
         """Get the content block from the web page with the path div#content.
         Parse the elements and put them into a json object with list of elements.
         """
-        summary_obj = json.loads(pdf_paper_summary(url))
+        summary_obj = json.loads(pdf_paper_summary(logger=self.logger, pdf_url=url))
+        self.logger.info("Summarized the paper.")
         article_json_obj: Dict[str, Any] = {
             "properties": {},
             "children": [],
@@ -719,25 +720,7 @@ class ArxivPaperArchiver(Archiver):
         article_json_obj["properties"]["type"] = "Arxiv"
         article_json_obj["properties"]["datetime"] = get_datetime()
 
-        author_dict = summary_obj.get("authors", {})
-        # Convert the author dictionary to a string, including first_two  and others.
-        author_str = ""
-        if author_dict.get("first_two", ""):
-            first_two_obj = author_dict["first_two"]
-            for author in first_two_obj:
-                author_str += author.get("name", "")
-                if author.get("affiliation", ""):
-                    affliation = author.get("affiliation", "")
-                    author_str += f" ({affliation})"
-                author_str += "\n"
-        if author_dict.get("others", ""):
-            others_obj = author_dict["others"]
-            for author in others_obj:
-                author_str += f", {author.get('name', '')}"
-                if author.get("affiliation", ""):
-                    affliation = author.get("affiliation", "")
-                    author_str += f" ({affliation})"
-                author_str += "\n"
+        author_str = summary_obj.get("authors", "")
 
         paragraphs: List[Dict[str, Any]] = [
             {"type": "h1", "text": summary_obj.get("title", "")},

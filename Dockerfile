@@ -4,6 +4,13 @@ FROM python:3.10-bullseye
 # Set the working directory in the container
 WORKDIR /app
 
+# Install system dependencies required for runtime.
+# Include libgl1-mesa-glx for OpenCV-python and libglib2.0-0 if necessary
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Define build-time environment variables
 ARG ENVIRONMENT
 ARG OPENAI_API_KEY

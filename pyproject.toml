@@ -27,6 +27,9 @@ pyautogen = "^0.2.0"
 cffi = "^1.16.0"
 autogenra = "^0.0.10a0"
 pymemgpt = "^0.2.7"
+unstructured = "0.12.4"
+unstructured-inference = "0.7.24"
+pdf2image = "1.17.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

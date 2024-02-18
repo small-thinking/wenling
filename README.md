@@ -24,6 +24,15 @@ docker-compose -f ./docker-compose.yml up --build wenling
 ## Local test of Railway.app deployment
 See https://docs.railway.app/guides/cli#local-development.
 
+# Local test of web service
+
+## Start the web service
+
+```
+uvicorn wenling.web_service:app --reload --log-level debug
+```
+
+
 ## Cleanup docker images not used
 ```
 docker rm $(docker ps -a -q) ; docker images | grep '<none>' | awk '{print $3}' | xargs docker rmi

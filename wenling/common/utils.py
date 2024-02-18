@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import tempfile
 import threading
 from datetime import datetime
 from typing import Any, Optional
@@ -125,3 +126,24 @@ class Logger:
         caller_name = caller_frame[3]
         caller_line = caller_frame[2]
         self.logger.warning(Fore.YELLOW + f"({caller_name} L{caller_line}): {message}" + Fore.RESET)
+
+
+def download_pdf(url: str) -> str:
+    """
+    Download a PDF from a URL and return the path to the downloaded file.
+
+    Args:
+        url (str): URL to the PDF file.
+
+    Returns:
+        str: Path to the downloaded PDF file.
+    """
+    response = requests.get(url)
+    if response.status_code == 200:
+        # Create a temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        temp_file.write(response.content)
+        temp_file.close()
+        return temp_file.name
+    else:
+        raise Exception(f"Failed to download PDF from {url}")

@@ -5,12 +5,12 @@ import json
 import os
 import re
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Coroutine, Dict, List
 
 from bs4 import BeautifulSoup, Tag
 from dotenv import load_dotenv  # type: ignore
 
-from wenling.common.model_utils import OpenAIChatModel
+from wenling.common.model_utils import OpenAIChatModel, pdf_paper_summary
 from wenling.common.notion_storage import NotionStorage
 from wenling.common.utils import *
 
@@ -28,6 +28,11 @@ class ArchiverOrchestrator:
                 # Match url has substack.com in it.
                 "match_regex": r"^https://.*\.substack\.com/p/.*$",
                 "archiver": SubstackArticleArchiver(name="SubstackArticleArchiver"),
+            },
+            {
+                # Match url has arxiv.org and ends with .pdf.
+                "match_regex": r"^https://arxiv\.org/pdf/.*\.pdf$",
+                "archiver": ArxivPaperArchiver(name="ArxivPaperArchiver"),
             },
         ]
         self.default_archiver = WebPageArchiver()
@@ -67,7 +72,7 @@ class Archiver(ABC):
 
     async def _auto_tagging(self, paragraphs: List[Dict[str, Any]]) -> List[str]:
         """Leverage the LLM to auto-generate the tags based on the contents."""
-        contents_str = "\n".join([paragraph.get("text", "") for paragraph in paragraphs])
+        contents_str = "\n".join([paragraph.get("text", "") for paragraph in paragraphs if type(paragraph) == dict])
         prompt = f"""
         Please help generate the tags based on the contents below:
         ---
@@ -692,3 +697,65 @@ class SubstackArticleArchiver(Archiver):
         except Exception as e:
             self.logger.error(f"Error parsing content. Details: {str(e)}")
             raise ValueError(f"Error parsing content. Details: {str(e)}")
+
+
+class ArxivPaperArchiver(Archiver):
+    def __init__(self, name: str, vendor_type: str = "openai", **kwargs):
+        super().__init__(name=name, vendor_type=vendor_type)
+        self.root_css_selector = "body"
+
+    async def _archive(self, url: str, notes: str | None = None) -> Coroutine[Any, Any, Dict[str, Any]]:
+        """Get the content block from the web page with the path div#content.
+        Parse the elements and put them into a json object with list of elements.
+        """
+        summary_obj = json.loads(pdf_paper_summary(url))
+        article_json_obj: Dict[str, Any] = {
+            "properties": {},
+            "children": [],
+        }
+        article_json_obj["properties"]["url"] = url
+        article_json_obj["properties"]["notes"] = notes if notes else ""
+        article_json_obj["properties"]["title"] = summary_obj["title"]
+        article_json_obj["properties"]["type"] = "Arxiv"
+        article_json_obj["properties"]["datetime"] = get_datetime()
+
+        author_dict = summary_obj.get("authors", {})
+        # Convert the author dictionary to a string, including first_two  and others.
+        author_str = ""
+        if author_dict.get("first_two", ""):
+            first_two_obj = author_dict["first_two"]
+            for author in first_two_obj:
+                author_str += author.get("name", "")
+                if author.get("affiliation", ""):
+                    affliation = author.get("affiliation", "")
+                    author_str += f" ({affliation})"
+                author_str += "\n"
+        if author_dict.get("others", ""):
+            others_obj = author_dict["others"]
+            for author in others_obj:
+                author_str += f", {author.get('name', '')}"
+                if author.get("affiliation", ""):
+                    affliation = author.get("affiliation", "")
+                    author_str += f" ({affliation})"
+                author_str += "\n"
+
+        paragraphs: List[Dict[str, Any]] = [
+            {"type": "h1", "text": summary_obj.get("title", "")},
+            {"type": "h3", "text": author_str},
+            {"type": "h2", "text": "Summary"},
+            {"type": "text", "text": summary_obj.get("summary", "")},
+            {"type": "h2", "text": "Contributions"},
+            {"type": "text", "text": summary_obj.get("contributions", "")},
+            {"type": "h2", "text": "Conclusions"},
+            {"type": "text", "text": summary_obj.get("conclusions", "")},
+        ]
+        article_json_obj["children"] = paragraphs
+
+        self.logger.info(f"Auto-generate tags based on the contents...")
+        tags = await self._auto_tagging(paragraphs=article_json_obj["children"])
+        article_json_obj["properties"]["tags"] = tags
+
+        if os.environ.get("VERBOSE") == "True":
+            json_object_str = json.dumps(article_json_obj, indent=2)
+            self.logger.info(f"Archived article: {json_object_str}")
+        return article_json_obj

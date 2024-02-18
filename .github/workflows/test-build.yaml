@@ -39,7 +39,7 @@ jobs:
           pip install pytest
       - name: Run tests
         run: |
-          pytest wenling/tests
+          poetry run pytest wenling/tests
       - name: Install lint dependencies
         run: |
           python -m pip install --upgrade pip

@@ -750,8 +750,8 @@ class PdfPaperArchiver(Archiver):
         article_json_obj["children"] = paragraphs
 
         self.logger.info(f"Auto-generate tags based on the contents...")
-        # tags = await self._auto_tagging(paragraphs=article_json_obj["children"])
-        article_json_obj["properties"]["tags"] = []
+        tags = await self._auto_tagging(paragraphs=article_json_obj["children"])
+        article_json_obj["properties"]["tags"] = tags
 
         if os.environ.get("VERBOSE") == "True":
             json_object_str = json.dumps(article_json_obj, indent=2)

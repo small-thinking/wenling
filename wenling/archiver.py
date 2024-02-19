@@ -30,9 +30,9 @@ class ArchiverOrchestrator:
                 "archiver": SubstackArticleArchiver(name="SubstackArticleArchiver"),
             },
             {
-                # Match url has arxiv.org
-                "match_regex": r"^https://arxiv\.org/.*$",
-                "archiver": ArxivPaperArchiver(name="ArxivPaperArchiver"),
+                # Match url has arxiv.org or any url ends with .pdf in it.
+                "match_regex": r"^https://arxiv\.org/abs/.*$|^https://arxiv\.org/pdf/.*\.pdf$|.*\.pdf$",
+                "archiver": PdfPaperArchiver(name="PdfPaperArchiver"),
             },
         ]
         self.default_archiver = WebPageArchiver()
@@ -699,7 +699,7 @@ class SubstackArticleArchiver(Archiver):
             raise ValueError(f"Error parsing content. Details: {str(e)}")
 
 
-class ArxivPaperArchiver(Archiver):
+class PdfPaperArchiver(Archiver):
     def __init__(self, name: str, vendor_type: str = "openai", **kwargs):
         super().__init__(name=name, vendor_type=vendor_type)
         self.root_css_selector = "body"
@@ -710,8 +710,10 @@ class ArxivPaperArchiver(Archiver):
         """
         if "abs" in url:
             pdf_url = url.replace("abs", "pdf") + ".pdf"
-        else:
+        elif url.endswith(".pdf"):
             pdf_url = url
+        else:
+            raise ValueError(f"The url {url} is not a valid pdf url.")
         summary_obj = json.loads(pdf_paper_summary(logger=self.logger, pdf_url=pdf_url))
         self.logger.info("Summarized the paper.")
         article_json_obj: Dict[str, Any] = {
@@ -725,6 +727,10 @@ class ArxivPaperArchiver(Archiver):
         article_json_obj["properties"]["datetime"] = get_datetime()
 
         author_str = summary_obj.get("authors", "")
+        contributions: List[Dict[str, Any]] = []
+        for contribution in summary_obj.get("contributions", []):
+            contributions.append({"type": "text", "text": contribution})
+        self.logger.info(f"Contributions: {contributions}")
 
         paragraphs: List[Dict[str, Any]] = [
             {"type": "h1", "text": summary_obj.get("title", "")},
@@ -732,15 +738,20 @@ class ArxivPaperArchiver(Archiver):
             {"type": "h2", "text": "Summary"},
             {"type": "text", "text": summary_obj.get("summary", "")},
             {"type": "h2", "text": "Contributions"},
-            {"type": "text", "text": summary_obj.get("contributions", "")},
-            {"type": "h2", "text": "Conclusions"},
-            {"type": "text", "text": summary_obj.get("conclusions", "")},
         ]
+        paragraphs.extend(contributions)
+        paragraphs.extend(
+            [
+                {"type": "h2", "text": "Conclusions"},
+                {"type": "text", "text": summary_obj.get("conclusions", "")},
+            ]
+        )
+
         article_json_obj["children"] = paragraphs
 
         self.logger.info(f"Auto-generate tags based on the contents...")
-        tags = await self._auto_tagging(paragraphs=article_json_obj["children"])
-        article_json_obj["properties"]["tags"] = tags
+        # tags = await self._auto_tagging(paragraphs=article_json_obj["children"])
+        article_json_obj["properties"]["tags"] = []
 
         if os.environ.get("VERBOSE") == "True":
             json_object_str = json.dumps(article_json_obj, indent=2)

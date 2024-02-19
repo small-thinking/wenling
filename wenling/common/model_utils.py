@@ -109,13 +109,22 @@ def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 8000):
             You will receive the paper text snippets (may have some noise text). 
             You are a research paper analysis service focused on determining the primary findings of the paper and analyzing its scientific quality.
 
-            Take a deep breath and think step by step about how to best accomplish this goal using the following steps.
-
-            OUTPUT SECTIONS in json format.
+            Take a deep breath and think step by step about how to best accomplish this goal using the following json structure:
+            
+            {{
+                "title": "The title of the paper",
+                "authors": "The authors of the paper",
+                "summary": "The summary of the paper",
+                "contributions": ["Contribution 1", "Contribution 2", "Contribution 3"],
+                "experiment": "The experiment of the paper",
+                "conclusion": "The conclusion of the paper"
+            }}
             
             Title: Extract the title of the paper.
             
             Authors: List of string includes the first 2 authors and other notable authors, each with their affiliation in parenthesis.
+            
+            Summary: What problem does the paper solve? What is the core idea of the paper? What is the main result?
 
             Contributions: Extract the primary paper unique contribution into a bulleted list of no more than 50 words per bullet.
 
@@ -163,23 +172,7 @@ def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 8000):
             ---
 
             Conclusion:
-            You output a 50 word summary of the quality of the paper and it's likelihood of being replicated in
-            future work as one of three levels: High, Medium, or Low.
-            You put that sentence and ratign into a section called SUMMARY.
-
-            OUTPUT INSTRUCTIONS
-            Create the output using the formatting above. And put them into a json format.
-            And each blob of text should be in markdown format.
-            For example:
-            {{
-                "title": "The title of the paper",
-                "authors": "The authors of the paper",
-                "summary": "The summary of the paper",
-                "contributions": "The contributions of the paper",
-                "experiment": "The experiment of the paper",
-                "conclusion": "The conclusion of the paper"
-            }}
-            
+            You output a 50 word summary of the paper.
         """
 
         summary = openai.inference(

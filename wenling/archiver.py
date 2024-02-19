@@ -30,8 +30,8 @@ class ArchiverOrchestrator:
                 "archiver": SubstackArticleArchiver(name="SubstackArticleArchiver"),
             },
             {
-                # Match url has arxiv.org and ends with .pdf.
-                "match_regex": r"^https://arxiv\.org/pdf/.*\.pdf$",
+                # Match url has arxiv.org
+                "match_regex": r"^https://arxiv\.org/.*$",
                 "archiver": ArxivPaperArchiver(name="ArxivPaperArchiver"),
             },
         ]
@@ -708,13 +708,17 @@ class ArxivPaperArchiver(Archiver):
         """Get the content block from the web page with the path div#content.
         Parse the elements and put them into a json object with list of elements.
         """
-        summary_obj = json.loads(pdf_paper_summary(logger=self.logger, pdf_url=url))
+        if "abs" in url:
+            pdf_url = url.replace("abs", "pdf") + ".pdf"
+        else:
+            pdf_url = url
+        summary_obj = json.loads(pdf_paper_summary(logger=self.logger, pdf_url=pdf_url))
         self.logger.info("Summarized the paper.")
         article_json_obj: Dict[str, Any] = {
             "properties": {},
             "children": [],
         }
-        article_json_obj["properties"]["url"] = url
+        article_json_obj["properties"]["url"] = pdf_url
         article_json_obj["properties"]["notes"] = notes if notes else ""
         article_json_obj["properties"]["title"] = summary_obj["title"]
         article_json_obj["properties"]["type"] = "Arxiv"

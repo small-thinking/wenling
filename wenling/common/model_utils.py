@@ -84,7 +84,7 @@ class OpenAIChatModel(Model):
         return result
 
 
-def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 4000):
+def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 8000):
     try:
         # Download PDF.
         logger.info(f"Downloading PDF from {pdf_url}...")
@@ -98,7 +98,7 @@ def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 4000):
         )
 
         paragraphs = OrderedDict()
-        for idx, element in enumerate(elements[:20]):
+        for idx, element in enumerate(elements[:50]):
             paragraphs[idx] = element.text  # Assuming `element` has a text attribute
 
         # Concatenate paragraphs into a single string
@@ -106,54 +106,70 @@ def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 4000):
         logger.info("Start to summarize the paper...")
         openai = OpenAIChatModel()
         sys_prompt = """
-            You will receive the paper text snippets (may have some noise text). Please return the paper according to the following rules for each paper name or url.
-
-            If you cannot retrieve the paper via the url, please tell the user it is a known occasionally issue of ChatGPT, and ask them to try again later on.
-
+            You will receive the paper text snippets (may have some noise text). 
             You are a research paper analysis service focused on determining the primary findings of the paper and analyzing its scientific quality.
 
             Take a deep breath and think step by step about how to best accomplish this goal using the following steps.
 
-            OUTPUT SECTIONS
-            TITLE Section: Extract the title of the paper.
+            OUTPUT SECTIONS in json format.
             
-            Extract a TL;DR of the content in 50 words or less, including who is presenting and the content being discussed into a section called SUMMARY.
+            Title: Extract the title of the paper.
+            
+            Authors: List of string includes the first 2 authors and other notable authors, each with their affiliation in parenthesis.
 
-            AUTHOR Section: List of string includes the first 2 authors and other notable authors, each with their affiliation in parenthesis.
+            Contributions: Extract the primary paper unique contribution into a bulleted list of no more than 50 words per bullet.
 
-            Extract the primary paper unique contribution into a bulleted list of no more than 50 words per bullet into a section called CONTRIBUTIONS.
+            If the paper is about a new algorithm, please briefly describe the core idea, and display the core formula if any.
+            If the paper is about a new system proposed, briefly describe the system architecture.
 
-            If the paper is about a new algorithm, please briefly describe the core idea, and display the core formula if any. If the paper is about a new system proposed, briefly describe the system architecture.
+            Experiment: Extract the empirical study or experiment in a section.
 
-            Extract the empirical study or experiment in a section called EXPERIMENT:
-
-            If this paper is about a new method that lift the performance, you briefly summarize the notable data used, the baseline methods compared, and the lift of the performance.
+            If this paper is about a new method that lift the performance, you briefly summarize the notable data used,
+            the baseline methods compared, and the lift of the performance.
 
             If the paper is a general paper, please do the following:
             ---
             Sample size
-            Check the Sample Size: The larger the sample size, the more confident you can be in the findings. A larger sample size reduces the margin of error and increases the study's power.
+            Check the Sample Size: The larger the sample size, the more confident you can be in the findings.
+            A larger sample size reduces the margin of error and increases the study's power.
             Confidence intervals
-            Look at the Confidence Intervals: Confidence intervals provide a range within which the true population parameter lies with a certain degree of confidence (usually 95% or 99%). Narrower confidence intervals suggest a higher level of precision and confidence in the estimate.
+            Look at the Confidence Intervals: Confidence intervals provide a range within which the true population
+            parameter lies with a certain degree of confidence (usually 95% or 99%).
+            Narrower confidence intervals suggest a higher level of precision and confidence in the estimate.
+            
             P-Value
-            Evaluate the P-value: The P-value tells you the probability that the results occurred by chance. A lower P-value (typically less than 0.05) suggests that the findings are statistically significant and not due to random chance.
+            Evaluate the P-value: The P-value tells you the probability that the results occurred by chance.
+            A lower P-value (typically less than 0.05) suggests that the findings are statistically
+            significant and not due to random chance.
+            
             Effect size
-            Consider the Effect Size: Effect size tells you how much of a difference there is between groups. A larger effect size indicates a stronger relationship and more confidence in the findings.
+            Consider the Effect Size: Effect size tells you how much of a difference there is between groups.
+            A larger effect size indicates a stronger relationship and more confidence in the findings.
+            
             Study design
-            Review the Study Design: Randomized controlled trials are usually considered the gold standard in research. If the study is observational, it may be less reliable.
+            Review the Study Design: Randomized controlled trials are usually considered the gold standard in research.
+            If the study is observational, it may be less reliable.
+            
             Consistency of results
-            Check for Consistency of Results: If the results are consistent across multiple studies, it increases the confidence in the findings.
+            Check for Consistency of Results: If the results are consistent across multiple studies,
+            it increases the confidence in the findings.
+            
             Data analysis methods
-            Examine the Data Analysis Methods: Check if the data analysis methods used are appropriate for the type of data and research question. Misuse of statistical methods can lead to incorrect conclusions.
+            Examine the Data Analysis Methods: Check if the data analysis methods used are appropriate for the type of
+            data and research question. Misuse of statistical methods can lead to incorrect conclusions.
             Researcher's interpretation
-            Assess the Researcher's Interpretation: The researchers should interpret their results in the context of the study's limitations. Overstating the findings can misrepresent the confidence level.
+            Assess the Researcher's Interpretation: The researchers should interpret their results in the context of
+            the study's limitations. Overstating the findings can misrepresent the confidence level.
             ---
 
-            CONCLUSION Section:
-            You output a 50 word summary of the quality of the paper and it's likelihood of being replicated in future work as one of three levels: High, Medium, or Low. You put that sentence and ratign into a section called SUMMARY.
+            Conclusion:
+            You output a 50 word summary of the quality of the paper and it's likelihood of being replicated in
+            future work as one of three levels: High, Medium, or Low.
+            You put that sentence and ratign into a section called SUMMARY.
 
             OUTPUT INSTRUCTIONS
-            Create the output using the formatting above. And put them into a json format. And each blob of text should be in markdown format.
+            Create the output using the formatting above. And put them into a json format.
+            And each blob of text should be in markdown format.
             For example:
             {{
                 "title": "The title of the paper",
@@ -164,7 +180,6 @@ def pdf_paper_summary(logger: Logger, pdf_url: str, truncate_size: int = 4000):
                 "conclusion": "The conclusion of the paper"
             }}
             
-            The output should have the keys of title, authors, summary, contributions, experiment, conclusion.
         """
 
         summary = openai.inference(

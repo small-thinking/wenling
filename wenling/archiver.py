@@ -72,7 +72,10 @@ class Archiver(ABC):
 
     async def _auto_tagging(self, paragraphs: List[Dict[str, Any]]) -> List[str]:
         """Leverage the LLM to auto-generate the tags based on the contents."""
-        contents_str = "\n".join([paragraph.get("text", "") for paragraph in paragraphs if type(paragraph) == dict])
+        contents_str = ""
+        for paragraph in paragraphs:
+            if type(paragraph) == dict and paragraph.get("type") == "text":
+                contents_str += paragraph.get("text", "") + "\n"
         prompt = f"""
             Please help generate the tags based on the contents below:
             ---
@@ -726,7 +729,12 @@ class PdfPaperArchiver(Archiver):
         article_json_obj["properties"]["type"] = "Arxiv"
         article_json_obj["properties"]["datetime"] = get_datetime()
 
-        author_str = summary_obj.get("authors", "")
+        author_blob = summary_obj.get("authors", "")
+        if type(author_blob) == list:
+            author_str = ", ".join(author_blob)
+        else:
+            author_str = author_blob
+
         contributions: List[Dict[str, Any]] = []
         for contribution in summary_obj.get("contributions", []):
             contributions.append({"type": "text", "text": contribution})
